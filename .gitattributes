@@ -1,0 +1,7 @@
+# Keep LF for everything we ship so scripts run on Linux servers
+* text=auto eol=lf
+*.sh text eol=lf
+*.service text eol=lf
+*.html text eol=lf
+*.md text eol=lf
+*.json text eol=lf
