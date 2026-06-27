@@ -42,13 +42,27 @@ and the provider/region use the fallbacks set near the top of `index.html`.
 
 ## Full install (page + real server stats)
 
-Clone the repo on your VPS and run the installer as root:
+One line, as root on your VPS:
 
 ```bash
-git clone https://github.com/NightRider322/pxn-sub.git
-cd pxn-sub
+bash <(curl -Ls https://raw.githubusercontent.com/NightRider322/PXN-SUB/main/scripts/install.sh)
+```
+
+The installer auto-downloads the page and daemon when run this way. Pass flags after a `--`:
+
+```bash
+bash <(curl -Ls https://raw.githubusercontent.com/NightRider322/PXN-SUB/main/scripts/install.sh) --no-stats
+```
+
+Or clone and run it from the repo (same result):
+
+```bash
+git clone https://github.com/NightRider322/PXN-SUB.git
+cd PXN-SUB
 sudo ./scripts/install.sh
 ```
+
+To update later, just run the one-liner again.
 
 This will:
 

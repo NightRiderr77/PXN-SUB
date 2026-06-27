@@ -22,6 +22,11 @@ RED=$'\e[31m'; GRN=$'\e[32m'; YLW=$'\e[33m'; DIM=$'\e[2m'; BLD=$'\e[1m'; RST=$'\
 info(){ printf "%s==>%s %s\n" "$GRN" "$RST" "$1"; }
 warn(){ printf "%s!!%s %s\n" "$YLW" "$RST" "$1"; }
 die(){ printf "%sxx%s %s\n" "$RED" "$RST" "$1" >&2; exit 1; }
+fetch(){ # <url> <dest>
+  if command -v curl >/dev/null 2>&1; then curl -fsSL "$1" -o "$2"
+  elif command -v wget >/dev/null 2>&1; then wget -qO "$2" "$1"
+  else return 1; fi
+}
 
 # ---- args --------------------------------------------------------------------
 WITH_STATS=1; XUI_DIR="/usr/local/x-ui"; THEME_DIR=""; IFACE="auto"
@@ -44,9 +49,25 @@ done
 
 [ "$(id -u)" -eq 0 ] || die "Please run as root (sudo)."
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-[ -f "$REPO_ROOT/index.html" ] || die "index.html not found next to scripts/ — run this from the repo clone."
+# Find the source files. When run from a clone, use the local files. When run
+# via `bash <(curl -Ls .../install.sh)`, download them from the repo instead.
+REPO="${REPO:-NightRider322/PXN-SUB}"
+BRANCH="${BRANCH:-main}"
+RAW_BASE="https://raw.githubusercontent.com/$REPO/$BRANCH"
+SCRIPT_DIR="$(cd "$(dirname "$0")" 2>/dev/null && pwd || echo /nonexistent)"
+
+if [ -f "$SCRIPT_DIR/../index.html" ]; then
+  REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+  info "Using local files from $REPO_ROOT"
+else
+  command -v curl >/dev/null 2>&1 || command -v wget >/dev/null 2>&1 || die "curl or wget is required."
+  REPO_ROOT="$(mktemp -d)"; trap 'rm -rf "$REPO_ROOT"' EXIT
+  mkdir -p "$REPO_ROOT/scripts"
+  info "Downloading files from $REPO@$BRANCH"
+  for f in index.html scripts/server_stats.sh scripts/pxn-sub-stats.service; do
+    fetch "$RAW_BASE/$f" "$REPO_ROOT/$f" || die "Failed to download $f"
+  done
+fi
 
 info "3X-UI dir   : $XUI_DIR"
 info "Theme dir   : $THEME_DIR"
