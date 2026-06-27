@@ -1,0 +1,13 @@
+# local preview / tooling
+.claude/
+status.json
+*.bak
+*.bak.*
+*.tmp
+
+# os / editor
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
