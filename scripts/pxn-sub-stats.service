@@ -1,0 +1,20 @@
+[Unit]
+Description=PXN Shield subscription stats collector
+Documentation=https://github.com/NightRider322/pxn-sub
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=-/etc/pxn-sub/stats.env
+ExecStart=/usr/local/x-ui/pxn_server_stats.sh
+Restart=always
+RestartSec=3
+Nice=10
+# light sandboxing — the collector only needs to read /proc and write its output dir
+NoNewPrivileges=true
+ProtectSystem=full
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
