@@ -491,9 +491,25 @@ body{
    from a non-default location. Leave the array as-is to try the
    common 3X-UI paths. Set FALLBACK_* for when no daemon is present.
 ============================================================ */
-var STATS_URLS = ["./status.json","../status.json","sub_stats/status.json","assets/status.json"];
+// Port the optional PXN stats server (scripts/pxn_stats.py) listens on. The page
+// auto-builds its stats URL from the CURRENT host + this port — no manual editing
+// after install. Must match --port in the installer. To force one exact URL
+// (e.g. behind a custom proxy), set STATS_OVERRIDE and it wins.
+var STATS_PORT = 8788;
+var STATS_OVERRIDE = "";
+var STATS_URLS = (function(){
+  if (STATS_OVERRIDE) return [STATS_OVERRIDE];
+  var loc = window.location, h = loc.hostname, out = [];
+  // 1) dedicated stats server on the same host, matching the page protocol
+  //    (so an HTTPS page never makes a blocked mixed-content request)
+  out.push(loc.protocol + "//" + h + ":" + STATS_PORT + "/status.json");
+  if (loc.protocol === "http:") out.push("https://" + h + ":" + STATS_PORT + "/status.json");
+  // 2) same-origin siblings — works if your panel happens to serve the theme dir
+  out.push("./status.json", "../status.json", "sub_stats/status.json", "assets/status.json");
+  return out;
+})();
 // Server Monitor + Infrastructure show REAL data only (from the stats daemon).
-// They stay "—" until status.json is reachable. Optionally hard-code your own
+// They stay "—" until a stats source is reachable. Optionally hard-code your own
 // real provider/region below to display them without the daemon; leave blank for "—".
 var FALLBACK_PROVIDER = "";
 var FALLBACK_REGION   = "";
