@@ -68,57 +68,57 @@ To update later, just run the one-liner again.
 This will:
 
 - copy `index.html` into the theme dir (default `/usr/local/x-ui/pxn_sub/`),
-- install a small collector (`pxn_server_stats.sh`) + a systemd service `pxn-sub-stats`,
-- write a `status.json` next to the page every 2s with real CPU / RAM / network (and a one-time geo lookup for ISP + region),
-- print the one manual panel step (set the Sub Theme Directory).
+- install a tiny **stats server** (`pxn_stats.py`, Python 3 stdlib) + systemd service `pxn-sub-stats`,
+- collect real CPU / RAM / network every 2s (plus a one-time geo lookup for ISP + region) and serve it with CORS on its own port,
+- open that port in `ufw`/`firewalld` if active, and print the one manual panel step.
 
 Installer flags:
 
 | Flag | Default | Purpose |
 |------|---------|---------|
-| `--no-stats` | off | Install the page only, skip the daemon |
+| `--no-stats` | off | Install the page only, skip the stats server |
+| `--port N` | `8788` | Port the stats server listens on |
 | `--xui-dir PATH` | `/usr/local/x-ui` | 3X-UI install directory |
 | `--theme-dir PATH` | `<xui-dir>/pxn_sub` | Where the page + status.json live |
 | `--iface NAME` | `auto` | Network interface for speed stats |
 | `--isp "NAME"` | geo lookup | Force the provider label |
 | `--region "NAME"` | geo lookup | Force the region label |
 | `--no-geo` | off | Disable the one-time external geo call |
+| `--cert PATH --key PATH` | auto | Serve stats over HTTPS with this cert/key |
+| `--no-tls` | off | Force plain HTTP even if a panel cert is found |
 
-Manage the collector:
+Manage the server:
 
 ```bash
 systemctl status pxn-sub-stats
 journalctl -u pxn-sub-stats -f
 ```
 
-### Making `status.json` reachable from the page
+### How live stats reach the page (automatic — no reverse proxy)
 
-The page fetches stats from these same-origin paths in order, then caches the one that works:
+The stats server runs as its **own process on its own port** and serves `status.json`
+with permissive CORS. **It never touches 3X-UI, so it cannot break the panel.** The page
+builds the URL itself from the current host + `STATS_PORT` (default `8788`), so there is
+nothing to edit after install:
 
 ```
-./status.json   ../status.json   sub_stats/status.json   assets/status.json
+<page-protocol>//<page-host>:8788/status.json
 ```
 
-3X-UI serves the rendered template from the Sub Theme Directory; depending on your
-version it may or may not serve sibling files like `status.json`. If the Server Monitor
-stays on demo values:
+It also writes `status.json` into the theme dir and tries same-origin paths
+(`./status.json`, …) as a bonus, in case your 3X-UI build serves the theme directory.
 
-- **Option A — serve it via your reverse proxy.** Point a location at the file and set
-  `STATS_URLS` near the top of `index.html` to that absolute URL.
+A few things to make sure of:
 
-  ```nginx
-  # serve the stats file on the same origin as your sub page
-  location = /pxn/status.json {
-      alias /usr/local/x-ui/pxn_sub/status.json;
-      add_header Cache-Control "no-store";
-  }
-  ```
-  then in `index.html`:
-  ```js
-  var STATS_URLS = ["https://your-domain/pxn/status.json"];
-  ```
-
-- **Option B — keep it page-only** with `--no-stats`.
+- **Open the port.** The installer handles `ufw`/`firewalld`; also open `8788/tcp` in your
+  VPS provider's firewall/security group.
+- **HTTPS sub page?** Cross-origin to an HTTP port would be blocked as mixed content, so the
+  installer reuses your panel's TLS cert automatically (detected from the 3X-UI DB) to serve
+  the stats port over HTTPS. If it isn't detected, pass `--cert /path/fullchain.pem --key /path/privkey.pem`.
+- **Behind Cloudflare (orange cloud)?** Custom ports aren't proxied unless they're a
+  [Cloudflare-supported HTTPS port](https://developers.cloudflare.com/fundamentals/reference/network-ports/)
+  — install with `--port 2096` (or `2083`/`2087`/`2053`), or grey-cloud the record.
+- Prefer no extra port? Set `STATS_OVERRIDE` in `index.html` to any URL you expose yourself, or run `--no-stats`.
 
 ---
 
@@ -127,7 +127,8 @@ stays on demo values:
 Everything lives at the top of the `<script>` block in `index.html`:
 
 ```js
-var STATS_URLS = ["./status.json","../status.json","sub_stats/status.json","assets/status.json"];
+var STATS_PORT = 8788;        // must match the installer's --port; the page auto-builds the URL
+var STATS_OVERRIDE = "";      // optional: force one exact stats URL (skips auto-discovery)
 var FALLBACK_PROVIDER = "";   // optional: your real provider, shown without the daemon ("" = "—")
 var FALLBACK_REGION   = "";   // optional: your real region ("" = "—")
 var POLL_MS = 2000;           // stats refresh interval
@@ -174,7 +175,7 @@ pxn-sub/
 ├─ scripts/
 │  ├─ install.sh                  # installs page + optional stats daemon
 │  ├─ uninstall.sh
-│  ├─ server_stats.sh             # collector → status.json
+│  ├─ pxn_stats.py                # collector + CORS stats server → status.json
 │  └─ pxn-sub-stats.service       # systemd unit
 ├─ docs/design.md                 # design + architecture notes
 └─ README.md

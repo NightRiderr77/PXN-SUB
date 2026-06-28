@@ -24,18 +24,28 @@ with micro-interactions and animations — delivered as a **single self-containe
 1. **Subscription + usage** — real, from `used/total/expire/sId/...`. Percent and remaining
    derived from the byte fields; expiry & online state computed client-side.
 2. **Client→server latency** — real, measured in-browser.
-3. **Server monitor + infrastructure** — real when the collector runs, else ambient demo
-   values + configurable fallback provider/region.
+3. **Server monitor + infrastructure** — REAL data only. Shows `—` / an `offline` chip
+   until a stats source responds; never fabricated values.
 
-## Stats mechanism (mirrors 3X-SUB, reimplemented)
+## Stats mechanism (auto-discovery, panel-safe)
 
-- `scripts/server_stats.sh` runs as systemd service `pxn-sub-stats`, sampling `/proc/stat`,
-  `/proc/meminfo`, `/proc/net/dev` every 2s and writing `status.json` atomically.
-- JSON fields match what the page expects: `cpu`, `ram`, `net_in`, `net_out`, `isp`,
-  `region`, `uptime`, `ts`, and a rolling `history` of `{t,c,r}` for the sparklines.
-- The page polls `STATS_URLS` (same-origin candidates), caches the first that works, and
-  falls back to demo mode if none respond. ISP/region come from a single cached geo lookup
-  (or are forced via config), never per-tick.
+3X-UI does **not** reliably serve sibling files from the Sub Theme Directory (newer builds
+only static-serve their embedded `dist/assets`), and patching the binary is off the table
+("nothing on the panel can break"). So stats are delivered by an independent server:
+
+- `scripts/pxn_stats.py` (Python 3 stdlib) runs as systemd service `pxn-sub-stats`. It
+  samples `/proc/stat`, `/proc/meminfo`, `/proc/net/dev` every 2s, does a one-time geo
+  lookup, and **serves the JSON with `Access-Control-Allow-Origin: *`** on its own port
+  (default 8788). It also writes `status.json` into the theme dir as a bonus same-origin path.
+- It is a separate process on a separate port — it never touches 3X-UI, so it cannot affect
+  the panel. The output dir is made writable via a systemd `ReadWritePaths` drop-in.
+- JSON fields: `cpu`, `ram`, `net_in`, `net_out`, `isp`, `region`, `uptime`, `ts`, and a
+  rolling `history` of `{t,c,r}` for the sparklines.
+- The page **auto-builds** the URL from `window.location` + `STATS_PORT`
+  (`<protocol>//<host>:8788/status.json`), matching the page protocol to avoid mixed-content;
+  it then also tries same-origin paths. The first that works is cached. No manual editing.
+- For HTTPS sub pages the installer reuses the panel's TLS cert (read from the 3X-UI DB) so
+  the stats port serves HTTPS on the same domain. Cloudflare-proxied sites use a CF HTTPS port.
 
 ## Rendering safety
 
@@ -60,7 +70,7 @@ substituted, so the page always previews cleanly.
 
 ```
 index.html                  whole page
-scripts/server_stats.sh     collector
+scripts/pxn_stats.py        collector + CORS stats server
 scripts/pxn-sub-stats.service
 scripts/install.sh / uninstall.sh
 docs/design.md              this file

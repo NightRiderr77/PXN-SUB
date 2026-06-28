@@ -2,19 +2,31 @@
 # =============================================================================
 # PXN Shield subscription page — installer
 #
-# Installs the custom 3X-UI subscription theme and (optionally) the live stats
-# collector. Run from a clone of the repo as root:
+# Installs the custom 3X-UI subscription theme and (optionally) a self-contained
+# stats server that the page auto-discovers — no reverse proxy, no panel changes.
 #
-#     sudo ./scripts/install.sh
+# One-liner (downloads everything):
+#   bash <(curl -Ls https://raw.githubusercontent.com/NightRider322/PXN-SUB/main/scripts/install.sh)
+# Or from a clone:
+#   sudo ./scripts/install.sh
+#
+# How live stats reach the page: the stats server runs as its OWN process on its
+# OWN port (default 8788) and serves status.json with CORS. It never touches
+# 3X-UI, so it cannot break the panel. index.html auto-builds the URL from the
+# page host + that port. It also writes status.json into the theme dir as a
+# same-origin fallback.
 #
 # Flags:
-#   --no-stats        Install only the page (skip the stats daemon).
-#   --xui-dir PATH    3X-UI install dir       (default: /usr/local/x-ui)
-#   --theme-dir PATH  Sub Theme Directory     (default: <xui-dir>/pxn_sub)
-#   --iface NAME      Network interface for speed stats (default: auto)
-#   --isp "NAME"      Force provider name shown on the page
-#   --region "NAME"   Force region shown on the page
-#   --no-geo          Disable the one-time external geo lookup
+#   --no-stats        Page only (no stats server).
+#   --port N          Stats server port            (default: 8788)
+#   --xui-dir PATH    3X-UI install dir            (default: /usr/local/x-ui)
+#   --theme-dir PATH  Sub Theme Directory          (default: <xui-dir>/pxn_sub)
+#   --iface NAME      Interface for speed stats    (default: auto)
+#   --isp "NAME"      Force provider label
+#   --region "NAME"   Force region label
+#   --no-geo          Disable the one-time geo lookup
+#   --cert PATH --key PATH   Serve stats over HTTPS with this cert/key
+#   --no-tls          Force plain HTTP even if a panel cert is found
 # =============================================================================
 set -euo pipefail
 
@@ -22,40 +34,38 @@ RED=$'\e[31m'; GRN=$'\e[32m'; YLW=$'\e[33m'; DIM=$'\e[2m'; BLD=$'\e[1m'; RST=$'\
 info(){ printf "%s==>%s %s\n" "$GRN" "$RST" "$1"; }
 warn(){ printf "%s!!%s %s\n" "$YLW" "$RST" "$1"; }
 die(){ printf "%sxx%s %s\n" "$RED" "$RST" "$1" >&2; exit 1; }
-fetch(){ # <url> <dest>
-  if command -v curl >/dev/null 2>&1; then curl -fsSL "$1" -o "$2"
-  elif command -v wget >/dev/null 2>&1; then wget -qO "$2" "$1"
-  else return 1; fi
-}
+fetch(){ if command -v curl >/dev/null 2>&1; then curl -fsSL "$1" -o "$2"
+         elif command -v wget >/dev/null 2>&1; then wget -qO "$2" "$1"; else return 1; fi; }
 
 # ---- args --------------------------------------------------------------------
-WITH_STATS=1; XUI_DIR="/usr/local/x-ui"; THEME_DIR=""; IFACE="auto"
-ISP=""; REGION=""; GEO_LOOKUP=1
+WITH_STATS=1; PORT=8788; XUI_DIR="/usr/local/x-ui"; THEME_DIR=""; IFACE="auto"
+ISP=""; REGION=""; GEO_LOOKUP=1; CERT=""; KEY=""; NO_TLS=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --no-stats) WITH_STATS=0;;
+    --port) PORT="$2"; shift;;
     --xui-dir) XUI_DIR="$2"; shift;;
     --theme-dir) THEME_DIR="$2"; shift;;
     --iface) IFACE="$2"; shift;;
     --isp) ISP="$2"; shift;;
     --region) REGION="$2"; shift;;
     --no-geo) GEO_LOOKUP=0;;
+    --cert) CERT="$2"; shift;;
+    --key) KEY="$2"; shift;;
+    --no-tls) NO_TLS=1;;
     -h|--help) grep -E '^#( |$)' "$0" | sed 's/^# \{0,1\}//'; exit 0;;
     *) die "Unknown option: $1";;
   esac
   shift
 done
 [ -z "$THEME_DIR" ] && THEME_DIR="$XUI_DIR/pxn_sub"
-
 [ "$(id -u)" -eq 0 ] || die "Please run as root (sudo)."
 
-# Find the source files. When run from a clone, use the local files. When run
-# via `bash <(curl -Ls .../install.sh)`, download them from the repo instead.
+# ---- locate source files (clone or download) ---------------------------------
 REPO="${REPO:-NightRider322/PXN-SUB}"
 BRANCH="${BRANCH:-main}"
 RAW_BASE="https://raw.githubusercontent.com/$REPO/$BRANCH"
 SCRIPT_DIR="$(cd "$(dirname "$0")" 2>/dev/null && pwd || echo /nonexistent)"
-
 if [ -f "$SCRIPT_DIR/../index.html" ]; then
   REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
   info "Using local files from $REPO_ROOT"
@@ -64,70 +74,105 @@ else
   REPO_ROOT="$(mktemp -d)"; trap 'rm -rf "$REPO_ROOT"' EXIT
   mkdir -p "$REPO_ROOT/scripts"
   info "Downloading files from $REPO@$BRANCH"
-  for f in index.html scripts/server_stats.sh scripts/pxn-sub-stats.service; do
+  for f in index.html scripts/pxn_stats.py scripts/pxn-sub-stats.service; do
     fetch "$RAW_BASE/$f" "$REPO_ROOT/$f" || die "Failed to download $f"
   done
 fi
 
-info "3X-UI dir   : $XUI_DIR"
-info "Theme dir   : $THEME_DIR"
+info "3X-UI dir : $XUI_DIR"
+info "Theme dir : $THEME_DIR"
 [ -d "$XUI_DIR" ] || warn "3X-UI not found at $XUI_DIR — installing the theme anyway."
 
 # ---- install the page --------------------------------------------------------
 mkdir -p "$THEME_DIR"
-if [ -f "$THEME_DIR/index.html" ]; then
-  cp -f "$THEME_DIR/index.html" "$THEME_DIR/index.html.bak.$(date +%s)"
-  info "Backed up existing index.html"
-fi
+[ -f "$THEME_DIR/index.html" ] && cp -f "$THEME_DIR/index.html" "$THEME_DIR/index.html.bak.$(date +%s)" && info "Backed up existing index.html"
 install -m 644 "$REPO_ROOT/index.html" "$THEME_DIR/index.html"
 info "Installed page -> $THEME_DIR/index.html"
 
-# ---- install the stats daemon ------------------------------------------------
+# ---- stats server ------------------------------------------------------------
 if [ "$WITH_STATS" -eq 1 ]; then
+  if ! command -v python3 >/dev/null 2>&1; then
+    warn "python3 not found — trying to install it"
+    if   command -v apt-get >/dev/null 2>&1; then apt-get update -qq && apt-get install -y -qq python3
+    elif command -v dnf     >/dev/null 2>&1; then dnf install -y python3
+    elif command -v yum     >/dev/null 2>&1; then yum install -y python3
+    fi
+  fi
+  command -v python3 >/dev/null 2>&1 || die "python3 is required for the stats server (or re-run with --no-stats)."
+
   STATUS_JSON="$THEME_DIR/status.json"
-  install -m 755 "$REPO_ROOT/scripts/server_stats.sh" "$XUI_DIR/pxn_server_stats.sh"
+  install -m 755 "$REPO_ROOT/scripts/pxn_stats.py" "$XUI_DIR/pxn_stats.py"
+
+  # auto-detect a TLS cert from the 3X-UI DB so the stats port matches an HTTPS
+  # sub page (no mixed-content). Honour explicit --cert/--key and --no-tls.
+  if [ "$NO_TLS" -eq 0 ] && [ -z "$CERT" ] && command -v sqlite3 >/dev/null 2>&1 && [ -f /etc/x-ui/x-ui.db ]; then
+    for pair in "subCertFile subKeyFile" "webCertFile webKeyFile"; do
+      ck=$(sqlite3 /etc/x-ui/x-ui.db "select value from settings where key='${pair%% *}'" 2>/dev/null || true)
+      kk=$(sqlite3 /etc/x-ui/x-ui.db "select value from settings where key='${pair##* }'" 2>/dev/null || true)
+      if [ -n "$ck" ] && [ -f "$ck" ] && [ -n "$kk" ] && [ -f "$kk" ]; then CERT="$ck"; KEY="$kk"; break; fi
+    done
+    [ -n "$CERT" ] && info "Found panel TLS cert — stats server will serve HTTPS"
+  fi
+  [ "$NO_TLS" -eq 1 ] && { CERT=""; KEY=""; }
 
   mkdir -p /etc/pxn-sub
   cat > /etc/pxn-sub/stats.env <<EOF
-# PXN Shield stats collector config — edit then: systemctl restart pxn-sub-stats
+# PXN Shield stats server config — edit then: systemctl restart pxn-sub-stats
 OUTPUT="$STATUS_JSON"
+PORT=$PORT
 INTERVAL=2
 IFACE="$IFACE"
 HISTORY_MAX=30
 GEO_LOOKUP=$GEO_LOOKUP
 ISP="$ISP"
 REGION="$REGION"
+CERT="$CERT"
+KEY="$KEY"
 EOF
   info "Wrote /etc/pxn-sub/stats.env"
 
   install -m 644 "$REPO_ROOT/scripts/pxn-sub-stats.service" /etc/systemd/system/pxn-sub-stats.service
+  # ensure the output dir is writable despite ProtectSystem
+  mkdir -p /etc/systemd/system/pxn-sub-stats.service.d
+  printf "[Service]\nReadWritePaths=%s\n" "$THEME_DIR" > /etc/systemd/system/pxn-sub-stats.service.d/paths.conf
+
+  # open the firewall port (best effort)
+  if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q "Status: active"; then
+    ufw allow "$PORT"/tcp >/dev/null 2>&1 && info "ufw: opened $PORT/tcp"
+  fi
+  if command -v firewall-cmd >/dev/null 2>&1 && firewall-cmd --state >/dev/null 2>&1; then
+    firewall-cmd --add-port="$PORT"/tcp --permanent >/dev/null 2>&1 && firewall-cmd --reload >/dev/null 2>&1 && info "firewalld: opened $PORT/tcp"
+  fi
+
   systemctl daemon-reload
   systemctl enable --now pxn-sub-stats.service >/dev/null 2>&1 || systemctl restart pxn-sub-stats.service
   sleep 3
   if systemctl is-active --quiet pxn-sub-stats.service; then
-    info "Stats service running. status.json -> $STATUS_JSON"
+    info "Stats server live on port $PORT  ${DIM}(status.json also at $STATUS_JSON)${RST}"
   else
-    warn "Stats service did not start. Check: journalctl -u pxn-sub-stats -n 40"
+    warn "Stats server did not start. Check: journalctl -u pxn-sub-stats -n 40"
   fi
 else
-  info "Skipping stats daemon (--no-stats). Page will show ambient demo values."
+  info "Skipping stats server (--no-stats). Server Monitor will read '—'."
 fi
 
 cat <<EOF
 
-${BLD}Almost done — one manual step in the 3X-UI panel:${RST}
-  1. Open  Panel Settings  ->  Subscription
-  2. Set   ${BLD}Sub Theme Directory${RST}  =  ${GRN}$THEME_DIR${RST}
-  3. Save, then restart the panel:   ${DIM}x-ui restart${RST}
+${BLD}One manual step in the 3X-UI panel:${RST}
+  1. Settings -> Subscription -> ${BLD}Sub Theme Directory${RST} = ${GRN}$THEME_DIR${RST}
+  2. Save, then: ${DIM}x-ui restart${RST}
 
-${BLD}If the Server Monitor stays on demo values${RST}, the sub server isn't serving
-status.json next to the page. Two fixes:
-  - Serve ${DIM}$THEME_DIR/status.json${RST} at a URL on the same origin as the sub page
-    (e.g. an nginx 'location' — see README), then set ${BLD}STATS_URLS${RST} in index.html
-    to that absolute URL; or
-  - Run with ${DIM}--no-stats${RST} to keep it page-only.
-
-Manage the collector:
-  ${DIM}systemctl status pxn-sub-stats   |   journalctl -u pxn-sub-stats -f${RST}
+${BLD}The page finds the stats server automatically${RST} at
+  ${DIM}<your-sub-host>:$PORT/status.json${RST}  — STATS_PORT in index.html must match (it is $PORT).
+EOF
+if [ "$WITH_STATS" -eq 1 ]; then cat <<EOF
+  - Make sure port ${BLD}$PORT${RST} is reachable (open it in your VPS provider's firewall too).
+  - HTTPS sub page? The installer reuses your panel's TLS cert if found; otherwise pass
+    ${DIM}--cert /path/fullchain.pem --key /path/privkey.pem${RST}. Behind Cloudflare, use a
+    Cloudflare-supported HTTPS port (e.g. ${DIM}--port 2096${RST}) or grey-cloud the record.
+EOF
+fi
+cat <<EOF
+Manage: ${DIM}systemctl status pxn-sub-stats  |  journalctl -u pxn-sub-stats -f${RST}
 ${GRN}Done.${RST}
 EOF
