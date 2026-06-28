@@ -17,7 +17,7 @@ monitoring (CPU / RAM / network) and infrastructure insights.
 
 - **Subscription overview** — plan name, active/disabled state, last-online, expiry with a days-left chip, and the usage ring (used / total) driven by the real panel data.
 - **Data Usage Overview** — upload, download, used, remaining, plus an animated progress bar.
-- **Server Monitor** — CPU, memory, upload & download speed with live sparklines. Real data when the optional collector is installed; tasteful ambient values otherwise.
+- **Server Monitor** — CPU, memory, upload & download speed with live sparklines. **Real data only**: when the optional collector is installed the panel goes `live`; otherwise it shows `—` and an `offline` chip (never fabricated numbers).
 - **Infrastructure Insights** — provider, region, and a **real** client→server latency check (HEAD request, color-coded green / amber / red).
 - **Micro-interactions** — count-up numbers, ring stroke-draw, animated sparklines, copy-to-clipboard with feedback, hover lifts, preloader, light/dark toggle. Respects `prefers-reduced-motion`.
 - **Branded actions** — Copy Subscription Link, Setup Guides & Apps, WhatsApp Support.
@@ -35,8 +35,9 @@ monitoring (CPU / RAM / network) and infrastructure insights.
 3. Save, then restart the panel: `x-ui restart`.
 4. Open any subscription link — you'll see the PXN page.
 
-In this mode the **latency check is real**; CPU / RAM / speed show ambient demo values
-and the provider/region use the fallbacks set near the top of `index.html`.
+In this mode the **latency check is still real**; the Server Monitor shows `—` /
+`offline` (no fake numbers) until you add the stats daemon below. You can optionally
+set your real provider/region in the `FALLBACK_*` constants near the top of `index.html`.
 
 ---
 
@@ -127,9 +128,9 @@ Everything lives at the top of the `<script>` block in `index.html`:
 
 ```js
 var STATS_URLS = ["./status.json","../status.json","sub_stats/status.json","assets/status.json"];
-var FALLBACK_PROVIDER = "PXN Shield Node";   // shown until/unless real geo data arrives
-var FALLBACK_REGION   = "Singapore";
-var POLL_MS = 2000;                            // stats refresh interval
+var FALLBACK_PROVIDER = "";   // optional: your real provider, shown without the daemon ("" = "—")
+var FALLBACK_REGION   = "";   // optional: your real region ("" = "—")
+var POLL_MS = 2000;           // stats refresh interval
 ```
 
 - **Brand name** — the header uses the panel's `{{ .subTitle }}` if set, else `PXN STORES LK`. Edit `#brandName` to hard-code it.
