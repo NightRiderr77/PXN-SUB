@@ -38,6 +38,7 @@
   data-sub-clash-url="{{ .subClashUrl }}"
   data-sub-title="{{ .subTitle }}"
   data-sub-support-url="{{ .subSupportUrl }}"
+  data-emails="{{ range $i, $e := .emails }}{{ if $i }}, {{ end }}{{ $e }}{{ end }}"
   data-datepicker="{{ .datepicker }}"></template>
 
 <style>
@@ -147,7 +148,7 @@ body{
   animation:ping 2.4s var(--ease) infinite;opacity:0}
 .dot.off{background:var(--bad)}
 @keyframes ping{0%{transform:scale(.6);opacity:.8}80%,100%{transform:scale(2.1);opacity:0}}
-.plan-name{font-size:clamp(26px,6vw,34px);font-weight:650;line-height:1.08;margin:16px 0 8px;letter-spacing:-.02em}
+.plan-name{font-size:clamp(24px,5.4vw,33px);font-weight:650;line-height:1.12;margin:16px 0 8px;letter-spacing:-.02em;overflow-wrap:anywhere}
 .plan-sub{color:var(--muted);font-size:13.5px;max-width:34ch}
 
 .meta-list{display:flex;flex-direction:column;gap:14px;margin-top:22px}
@@ -245,10 +246,10 @@ body{
 .btn.copy.ok{background:rgba(58,209,122,.12);border-color:rgba(58,209,122,.4);color:var(--live)}
 
 /* ============================ Footer ============================ */
-.foot{display:flex;align-items:center;justify-content:center;gap:7px;color:var(--faint);font-size:12.5px;padding:10px 0 0}
-.foot b{color:var(--text-dim);font-weight:600}
-.heart{color:#e5534b;animation:beat 1.8s var(--ease) infinite;display:inline-block}
-@keyframes beat{0%,100%{transform:scale(1)}15%{transform:scale(1.22)}30%{transform:scale(1)}}
+.foot{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:4px 8px;color:var(--faint);font-size:12.5px;padding:10px 12px 0;text-align:center}
+.foot-sep{color:var(--faint);opacity:.6}
+.foot-link{color:var(--text-dim);text-decoration:none;font-weight:600;transition:color .2s var(--ease)}
+.foot-link:hover{color:var(--text)}
 
 /* ============================ Toast ============================ */
 .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(140%);
@@ -474,7 +475,9 @@ body{
   </section>
 
   <footer class="foot reveal" style="animation-delay:.38s">
-    Powered with <span class="heart">♥</span> by <b>PXN Shield</b>
+    <span>© 2026 PXN STORES LK. All rights reserved.</span>
+    <span class="foot-sep">·</span>
+    <a class="foot-link" href="https://pxnstores.lk" target="_blank" rel="noopener">pxnstores.lk</a>
   </footer>
 </main>
 
@@ -489,8 +492,11 @@ body{
    common 3X-UI paths. Set FALLBACK_* for when no daemon is present.
 ============================================================ */
 var STATS_URLS = ["./status.json","../status.json","sub_stats/status.json","assets/status.json"];
-var FALLBACK_PROVIDER = "PXN Shield Node";
-var FALLBACK_REGION   = "Singapore";
+// Server Monitor + Infrastructure show REAL data only (from the stats daemon).
+// They stay "—" until status.json is reachable. Optionally hard-code your own
+// real provider/region below to display them without the daemon; leave blank for "—".
+var FALLBACK_PROVIDER = "";
+var FALLBACK_REGION   = "";
 var POLL_MS = 2000;
 
 /* ---------- helpers ---------- */
@@ -564,7 +570,8 @@ var D = {
   expire:     isTpl(g("expire"))? Math.floor((Date.now()+28*86400000)/1000) : Number(g("expire")),
   lastOnline: isTpl(g("last-online"))? Date.now()-15000 : Number(g("last-online")),
   subUrl:     isTpl(g("sub-url"))? window.location.href : g("sub-url"),
-  support:    isTpl(g("sub-support-url"))? "" : g("sub-support-url")
+  support:    isTpl(g("sub-support-url"))? "" : g("sub-support-url"),
+  emails:     isTpl(g("emails"))? "customer-001@pxnstores.lk" : g("emails")
 };
 
 /* ---------- header / brand ---------- */
@@ -577,7 +584,7 @@ if(!D.enabled){
   $("statusText").textContent="Disabled";
   $("planSub").textContent="This subscription is disabled. Contact support to reactivate.";
 }
-$("planName").textContent = D.title || "PXN Shield Access";
+$("planName").textContent = D.emails || D.title || "Subscription";
 
 /* subscription id */
 $("subId").textContent=D.sid;
@@ -667,16 +674,18 @@ $("copySub").addEventListener("click",function(){
 if(D.support){ $("supportBtn").setAttribute("href",D.support); }
 
 /* ============================================================
-   Server monitor + infrastructure (progressive enhancement)
+   Server monitor + infrastructure — REAL data only.
+   Everything stays "—" until the stats daemon's status.json is
+   reachable. No demo / placeholder numbers are ever shown.
 ============================================================ */
 var BUF=24;
 var buffers={cpu:[],ram:[],up:[],down:[]};
-function seed(arr,base,spread){ for(var i=0;i<BUF;i++) arr.push(base+(Math.random()-.5)*spread); }
-seed(buffers.cpu,5,4); seed(buffers.ram,22,6); seed(buffers.up,180,120); seed(buffers.down,40,40);
+var hasReal=false;
 
 function sparkPath(id,arr,max){
   var svg=$(id); if(!svg) return;
   var line=svg.querySelector(".line"), area=svg.querySelector(".area");
+  if(!arr || arr.length<2){ line.removeAttribute("d"); area.removeAttribute("d"); return; }
   var n=arr.length, w=100, h=34, mx=max||Math.max.apply(null,arr)*1.25||1;
   var pts=arr.map(function(v,i){
     var x=(i/(n-1))*w; var y=h-2-(Math.max(v,0)/mx)*(h-4);
@@ -688,7 +697,17 @@ function sparkPath(id,arr,max){
 }
 function pushVal(key,v){ var a=buffers[key]; a.push(v); if(a.length>BUF) a.shift(); }
 
-var demoMode=true;
+function setSource(live){
+  var c=$("monSource");
+  c.textContent = live ? "live" : "offline";
+  c.classList.toggle("live", !!live);
+}
+function renderEmpty(){
+  $("cpuVal").textContent="—"; $("ramVal").textContent="—";
+  $("upVal").textContent="—"; $("downVal").textContent="—";
+  $("upUnit").textContent="KB/s"; $("downUnit").textContent="KB/s";
+  sparkPath("cpuSpark",[]); sparkPath("ramSpark",[]); sparkPath("upSpark",[]); sparkPath("downSpark",[]);
+}
 function renderMon(cpu,ram,up,down){
   $("cpuVal").textContent=cpu.toFixed(cpu<10?1:0);
   $("ramVal").textContent=ram.toFixed(ram<10?1:0);
@@ -700,54 +719,48 @@ function renderMon(cpu,ram,up,down){
   sparkPath("upSpark",buffers.up,null);
   sparkPath("downSpark",buffers.down,null);
 }
-function demoTick(){
-  var c=buffers.cpu, r=buffers.ram, u=buffers.up, d=buffers.down;
-  function drift(prev,min,max,step){ var v=prev+(Math.random()-.5)*step; return Math.max(min,Math.min(max,v)); }
-  var nc=drift(c[c.length-1],1,18,5), nr=drift(r[r.length-1],14,46,6),
-      nu=drift(u[u.length-1],20,520,140), nd=drift(d[d.length-1],5,260,90);
-  pushVal("cpu",nc);pushVal("ram",nr);pushVal("up",nu);pushVal("down",nd);
-  renderMon(nc,nr,nu,nd);
-}
 
-function applyStats(data){
-  demoMode=false;
-  $("monSource").textContent="real"; $("monSource").classList.add("live");
-  var cpu=Number(data.cpu)||0, ram=Number(data.ram)||0;
-  var up=Number(data.net_out)||0, down=Number(data.net_in)||0;
+function applyStats(d){
+  hasReal=true; setSource(true);
+  var cpu=Number(d.cpu)||0, ram=Number(d.ram)||0;
+  var up=Number(d.net_out)||0, down=Number(d.net_in)||0;
+  if(Array.isArray(d.history) && d.history.length && buffers.cpu.length===0){
+    d.history.slice(-BUF).forEach(function(p){
+      buffers.cpu.push(Number(p.c)||0); buffers.ram.push(Number(p.r)||0);
+    });
+  }
   pushVal("cpu",cpu);pushVal("ram",ram);pushVal("up",up);pushVal("down",down);
   renderMon(cpu,ram,up,down);
-  if(data.isp) $("provider").textContent=data.isp;
-  if(data.region) $("region").textContent=data.region;
-  if(Array.isArray(data.history) && data.history.length){
-    var hc=[],hr=[];
-    data.history.slice(-BUF).forEach(function(p){ hc.push(Number(p.c)||0); hr.push(Number(p.r)||0); });
-    if(hc.length>3){ buffers.cpu=hc; buffers.ram=hr; sparkPath("cpuSpark",hc,100); sparkPath("ramSpark",hr,100); }
-  }
+  $("provider").textContent = d.isp ? d.isp : (FALLBACK_PROVIDER || "—");
+  $("region").textContent   = d.region ? d.region : (FALLBACK_REGION || "—");
 }
 
-var statsUrlOk=null;
+var statsUrlOk=null, pollTimer;
+function scheduleNext(){ clearTimeout(pollTimer); pollTimer=setTimeout(fetchStats,POLL_MS); }
 function fetchStats(){
   var urls = statsUrlOk? [statsUrlOk] : STATS_URLS;
   var tried=0;
   function tryNext(){
-    if(tried>=urls.length){ if(demoMode) demoTick(); scheduleNext(); return; }
-    var url=urls[tried++]+(urls[tried-1].indexOf("?")===-1?"?t=":"&t=")+Date.now();
+    if(tried>=urls.length){            // no stats source reachable this round
+      if(!hasReal) setSource(false);   // never fabricate values
+      scheduleNext(); return;
+    }
+    var base=urls[tried++];
+    var url=base+(base.indexOf("?")===-1?"?t=":"&t=")+Date.now();
     fetch(url,{cache:"no-store"}).then(function(res){
       if(!res.ok) throw 0; return res.json();
-    }).then(function(data){
-      statsUrlOk=urls[tried-1].split("?")[0];
-      applyStats(data); scheduleNext();
+    }).then(function(d){
+      statsUrlOk=base; applyStats(d); scheduleNext();
     }).catch(function(){ tryNext(); });
   }
   tryNext();
 }
-var pollTimer;
-function scheduleNext(){ clearTimeout(pollTimer); pollTimer=setTimeout(fetchStats,POLL_MS); }
 
-/* provider/region defaults until/unless real data lands */
-$("provider").textContent=FALLBACK_PROVIDER;
-$("region").textContent=FALLBACK_REGION;
-renderMon(buffers.cpu[BUF-1],buffers.ram[BUF-1],buffers.up[BUF-1],buffers.down[BUF-1]);
+/* honest empty state, then poll for real data */
+$("provider").textContent = FALLBACK_PROVIDER || "—";
+$("region").textContent   = FALLBACK_REGION || "—";
+setSource(false);
+renderEmpty();
 fetchStats();
 
 /* ---------- latency check ---------- */
