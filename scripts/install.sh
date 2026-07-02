@@ -155,11 +155,18 @@ EOF
     firewall-cmd --add-port="$PORT"/tcp --permanent >/dev/null 2>&1 && firewall-cmd --reload >/dev/null 2>&1 && info "firewalld: opened $PORT/tcp"
   fi
 
+  rm -f "$XUI_DIR/pxn_server_stats.sh"   # drop the stale bash collector from earlier installs
   systemctl daemon-reload
-  systemctl enable --now pxn-sub-stats.service >/dev/null 2>&1 || systemctl restart pxn-sub-stats.service
+  systemctl enable pxn-sub-stats.service >/dev/null 2>&1 || true
+  systemctl restart pxn-sub-stats.service   # RESTART (not just enable) so a changed ExecStart takes effect
   sleep 3
   if systemctl is-active --quiet pxn-sub-stats.service; then
-    info "Stats server live on port $PORT  ${DIM}(status.json also at $STATUS_JSON)${RST}"
+    LOCAL_CHECK=$(curl -s -m 4 "http://127.0.0.1:$PORT/status.json" 2>/dev/null | head -c 40)
+    if [ -n "$LOCAL_CHECK" ]; then
+      info "Stats server live on port $PORT  ${DIM}(local check OK)${RST}"
+    else
+      warn "Service is active but port $PORT isn't answering yet — journalctl -u pxn-sub-stats -n 30"
+    fi
   else
     warn "Stats server did not start. Check: journalctl -u pxn-sub-stats -n 40"
   fi
