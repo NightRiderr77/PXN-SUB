@@ -33,19 +33,28 @@ with micro-interactions and animations — delivered as a **single self-containe
 only static-serve their embedded `dist/assets`), and patching the binary is off the table
 ("nothing on the panel can break"). So stats are delivered by an independent server:
 
-- `scripts/pxn_stats.py` (Python 3 stdlib) runs as systemd service `pxn-sub-stats`. It
-  samples `/proc/stat`, `/proc/meminfo`, `/proc/net/dev` every 2s, does a one-time geo
-  lookup, and **serves the JSON with `Access-Control-Allow-Origin: *`** on its own port
-  (default 8788). It also writes `status.json` into the theme dir as a bonus same-origin path.
-- It is a separate process on a separate port — it never touches 3X-UI, so it cannot affect
-  the panel. The output dir is made writable via a systemd `ReadWritePaths` drop-in.
-- JSON fields: `cpu`, `ram`, `net_in`, `net_out`, `isp`, `region`, `uptime`, `ts`, and a
-  rolling `history` of `{t,c,r}` for the sparklines.
-- The page **auto-builds** the URL from `window.location` + `STATS_PORT`
-  (`<protocol>//<host>:8788/status.json`), matching the page protocol to avoid mixed-content;
-  it then also tries same-origin paths. The first that works is cached. No manual editing.
-- For HTTPS sub pages the installer reuses the panel's TLS cert (read from the 3X-UI DB) so
-  the stats port serves HTTPS on the same domain. Cloudflare-proxied sites use a CF HTTPS port.
+Confirmed against a live panel: `/sub/<id>/…status.json` and every asset path return 404,
+so no sibling file can be served without patching the binary. `scripts/pxn_stats.py`
+(Python 3 stdlib, systemd `pxn-sub-stats`) samples `/proc/stat`, `/proc/meminfo`,
+`/proc/net/dev` every 2s + one-time geo, then delivers via **two panel-safe channels** the
+page tries in order:
+
+1. **Same-origin embed (primary).** The daemon rewrites the theme's `index.html`, replacing
+   the body of `<script id="pxn-stats-embed">` with the current JSON (atomic temp+rename;
+   JSON never contains `{{` or `</script>` so `html/template` passes it through untouched).
+   The page reads it inline on load, then refreshes by re-fetching its own URL with
+   `Accept: text/html` and re-parsing the embed. Works behind Cloudflare/any proxy, same
+   port as the sub link, no CORS. Requires 3X-UI to re-read the theme per request (so an
+   `x-ui restart` after setting the theme dir); a freshness gate (`ts` < 30s) ignores a
+   stale embed if the panel caches the theme.
+2. **Dedicated port (fallback).** Same JSON served with `Access-Control-Allow-Origin: *` on
+   its own port (default 8788). The page auto-builds `<protocol>//<host>:8788/status.json`,
+   protocol-matched to avoid mixed-content. Installer opens the firewall port and reuses the
+   panel's TLS cert (read from `/etc/x-ui/x-ui.db` via python3) for HTTPS.
+
+Both channels are separate from 3X-UI (own process/port, and only OUR theme file is written
+via a `ReadWritePaths` drop-in) — the panel cannot break. JSON fields: `cpu`, `ram`,
+`net_in`, `net_out`, `isp`, `region`, `uptime`, `ts`, rolling `history` of `{t,c,r}`.
 
 ## Rendering safety
 

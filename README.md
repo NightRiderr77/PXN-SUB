@@ -69,7 +69,8 @@ This will:
 
 - copy `index.html` into the theme dir (default `/usr/local/x-ui/pxn_sub/`),
 - install a tiny **stats server** (`pxn_stats.py`, Python 3 stdlib) + systemd service `pxn-sub-stats`,
-- collect real CPU / RAM / network every 2s (plus a one-time geo lookup for ISP + region) and serve it with CORS on its own port,
+- collect real CPU / RAM / network every 2s (plus a one-time geo lookup for ISP + region),
+- deliver it two ways: **embedded into the theme's `index.html`** (same-origin, panel-safe) and served with CORS on its own port,
 - open that port in `ufw`/`firewalld` if active, and print the one manual panel step.
 
 Installer flags:
@@ -94,31 +95,32 @@ systemctl status pxn-sub-stats
 journalctl -u pxn-sub-stats -f
 ```
 
-### How live stats reach the page (automatic — no reverse proxy)
+### How live stats reach the page (automatic — no reverse proxy, panel-safe)
 
-The stats server runs as its **own process on its own port** and serves `status.json`
-with permissive CORS. **It never touches 3X-UI, so it cannot break the panel.** The page
-builds the URL itself from the current host + `STATS_PORT` (default `8788`), so there is
-nothing to edit after install:
+Stock 3X-UI does **not** serve sibling files from the theme directory (`/sub/.../status.json`
+returns 404), and patching the x-ui binary — how 3X-SUB does it — is the one thing that can
+break the panel. So the daemon uses two channels the page tries in order, and **neither
+touches 3X-UI**:
 
-```
-<page-protocol>//<page-host>:8788/status.json
-```
+1. **Same-origin embed (primary).** The daemon writes the live JSON straight into your
+   theme's `index.html` (inside a `<script id="pxn-stats-embed">` tag, atomically). The stats
+   then travel *with the page*, on the same origin/port as your sub link — so it works behind
+   Cloudflare, reverse proxies, any port, with no CORS and no mixed content. The page reads it
+   on load and refreshes by re-fetching its own URL.
+   **After install you must `x-ui restart`** so the panel serves the freshly-updated theme.
 
-It also writes `status.json` into the theme dir and tries same-origin paths
-(`./status.json`, …) as a bonus, in case your 3X-UI build serves the theme directory.
+2. **Dedicated port (fallback).** The daemon also serves `status.json` with CORS on its own
+   port (default `8788`); the page auto-builds `<page-protocol>//<host>:8788/status.json`.
+   Used if the panel caches the theme instead of re-reading it. To use this channel:
+   - **Open the port** — the installer handles `ufw`/`firewalld`; also open it in your VPS
+     provider's firewall/security group.
+   - **HTTPS sub page?** The installer reuses your panel's TLS cert automatically (read from
+     the 3X-UI DB) so the port serves HTTPS with a valid cert. Else pass `--cert … --key …`.
+   - **Behind Cloudflare?** Use a [CF-supported HTTPS port](https://developers.cloudflare.com/fundamentals/reference/network-ports/)
+     (`--port 2096`/`2083`/`2087`/`2053`) or grey-cloud the record.
 
-A few things to make sure of:
-
-- **Open the port.** The installer handles `ufw`/`firewalld`; also open `8788/tcp` in your
-  VPS provider's firewall/security group.
-- **HTTPS sub page?** Cross-origin to an HTTP port would be blocked as mixed content, so the
-  installer reuses your panel's TLS cert automatically (detected from the 3X-UI DB) to serve
-  the stats port over HTTPS. If it isn't detected, pass `--cert /path/fullchain.pem --key /path/privkey.pem`.
-- **Behind Cloudflare (orange cloud)?** Custom ports aren't proxied unless they're a
-  [Cloudflare-supported HTTPS port](https://developers.cloudflare.com/fundamentals/reference/network-ports/)
-  — install with `--port 2096` (or `2083`/`2087`/`2053`), or grey-cloud the record.
-- Prefer no extra port? Set `STATS_OVERRIDE` in `index.html` to any URL you expose yourself, or run `--no-stats`.
+Prefer to point at your own URL instead? Set `STATS_OVERRIDE` in `index.html`. Or run
+`--no-stats` to keep it page-only (Server Monitor reads `—`).
 
 ---
 

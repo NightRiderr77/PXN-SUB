@@ -23,7 +23,7 @@ Config via environment (see /etc/pxn-sub/stats.env):
   GEO_LOOKUP   "1" to allow one external geo call (default 1)
   CERT, KEY    TLS cert/key paths -> serve HTTPS  (optional)
 """
-import json, os, ssl, time, threading, urllib.request
+import json, os, re, ssl, time, threading, urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 OUTPUT   = os.environ.get("OUTPUT", "/usr/local/x-ui/pxn_sub/status.json")
@@ -36,9 +36,40 @@ REGION   = os.environ.get("REGION", "")
 GEO      = os.environ.get("GEO_LOOKUP", "1") == "1"
 CERT     = os.environ.get("CERT", "")
 KEY      = os.environ.get("KEY", "")
+# Theme index.html to embed stats into (same-origin delivery, no extra port).
+# Defaults to index.html next to OUTPUT; set empty to disable embedding.
+THEME_HTML = os.environ.get("THEME_HTML", os.path.join(os.path.dirname(OUTPUT), "index.html"))
 
 _state = {"json": b"{}"}
 _lock = threading.Lock()
+_EMBED_RE = re.compile(
+    r'(<script id="pxn-stats-embed"[^>]*>)(.*?)(</script>)', re.S)
+
+
+def embed_into_theme(data):
+    """Replace the #pxn-stats-embed script body in the theme HTML with `data`.
+    Atomic write so 3X-UI never reads a half-written file. No-op if the theme
+    file or marker is missing (JSON never contains '{{' or '</script>')."""
+    if not THEME_HTML:
+        return
+    try:
+        with open(THEME_HTML, "r", encoding="utf-8") as f:
+            html = f.read()
+    except Exception:
+        return
+    if 'id="pxn-stats-embed"' not in html:
+        return
+    body = data.decode("utf-8", "replace")
+    new = _EMBED_RE.sub(lambda m: m.group(1) + body + m.group(3), html, count=1)
+    if new == html:
+        return
+    try:
+        tmp = THEME_HTML + ".pxn.tmp"
+        with open(tmp, "w", encoding="utf-8", newline="") as f:
+            f.write(new)
+        os.replace(tmp, THEME_HTML)
+    except Exception:
+        pass
 
 
 def detect_iface():
@@ -164,6 +195,7 @@ def collector():
                 os.replace(tmp, OUTPUT)
             except Exception:
                 pass
+            embed_into_theme(data)  # same-origin delivery via the page itself
         except Exception:
             continue
 
