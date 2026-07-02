@@ -103,15 +103,25 @@ if [ "$WITH_STATS" -eq 1 ]; then
   STATUS_JSON="$THEME_DIR/status.json"
   install -m 755 "$REPO_ROOT/scripts/pxn_stats.py" "$XUI_DIR/pxn_stats.py"
 
-  # auto-detect a TLS cert from the 3X-UI DB so the stats port matches an HTTPS
-  # sub page (no mixed-content). Honour explicit --cert/--key and --no-tls.
-  if [ "$NO_TLS" -eq 0 ] && [ -z "$CERT" ] && command -v sqlite3 >/dev/null 2>&1 && [ -f /etc/x-ui/x-ui.db ]; then
-    for pair in "subCertFile subKeyFile" "webCertFile webKeyFile"; do
-      ck=$(sqlite3 /etc/x-ui/x-ui.db "select value from settings where key='${pair%% *}'" 2>/dev/null || true)
-      kk=$(sqlite3 /etc/x-ui/x-ui.db "select value from settings where key='${pair##* }'" 2>/dev/null || true)
-      if [ -n "$ck" ] && [ -f "$ck" ] && [ -n "$kk" ] && [ -f "$kk" ]; then CERT="$ck"; KEY="$kk"; break; fi
-    done
-    [ -n "$CERT" ] && info "Found panel TLS cert — stats server will serve HTTPS"
+  # auto-detect a TLS cert from the 3X-UI DB (via python3 — no sqlite3 CLI needed)
+  # so the stats port matches an HTTPS sub page and avoids mixed-content blocks.
+  if [ "$NO_TLS" -eq 0 ] && [ -z "$CERT" ] && [ -f /etc/x-ui/x-ui.db ]; then
+    CK=$(python3 - <<'PY' 2>/dev/null || true
+import sqlite3, os
+db = "/etc/x-ui/x-ui.db"
+def get(k):
+    try:
+        c = sqlite3.connect(db); r = c.execute("select value from settings where key=?", (k,)).fetchone(); c.close()
+        return r[0] if r and r[0] else ""
+    except Exception:
+        return ""
+for cf_k, kf_k in (("subCertFile","subKeyFile"), ("webCertFile","webKeyFile")):
+    cf, kf = get(cf_k), get(kf_k)
+    if cf and kf and os.path.exists(cf) and os.path.exists(kf):
+        print(cf + "|" + kf); break
+PY
+)
+    if [ -n "$CK" ]; then CERT="${CK%%|*}"; KEY="${CK##*|}"; info "Found panel TLS cert — stats server will serve HTTPS"; fi
   fi
   [ "$NO_TLS" -eq 1 ] && { CERT=""; KEY=""; }
 
@@ -128,6 +138,7 @@ ISP="$ISP"
 REGION="$REGION"
 CERT="$CERT"
 KEY="$KEY"
+THEME_HTML="$THEME_DIR/index.html"
 EOF
   info "Wrote /etc/pxn-sub/stats.env"
 
@@ -162,14 +173,18 @@ ${BLD}One manual step in the 3X-UI panel:${RST}
   1. Settings -> Subscription -> ${BLD}Sub Theme Directory${RST} = ${GRN}$THEME_DIR${RST}
   2. Save, then: ${DIM}x-ui restart${RST}
 
-${BLD}The page finds the stats server automatically${RST} at
-  ${DIM}<your-sub-host>:$PORT/status.json${RST}  — STATS_PORT in index.html must match (it is $PORT).
+${BLD}How live stats reach the page (two channels, tried in order):${RST}
+  1. ${BLD}Same-origin embed${RST} — the daemon writes the stats straight into your theme's
+     index.html, so they travel with the page. No extra port, works behind any proxy/CDN,
+     and never touches 3X-UI. ${BLD}Requires an ${DIM}x-ui restart${RST}${BLD} after step 2${RST} so the panel
+     serves the fresh theme.
+  2. ${BLD}Dedicated port${RST} ${DIM}$PORT${RST} — fallback if the panel caches the theme. Open port
+     ${BLD}$PORT${RST} in your VPS provider's firewall. HTTPS sub page? The installer reuses your
+     panel's TLS cert if found (else pass ${DIM}--cert ... --key ...${RST}). Behind Cloudflare, use a
+     CF-supported HTTPS port (${DIM}--port 2096${RST}) or grey-cloud the record.
 EOF
 if [ "$WITH_STATS" -eq 1 ]; then cat <<EOF
-  - Make sure port ${BLD}$PORT${RST} is reachable (open it in your VPS provider's firewall too).
-  - HTTPS sub page? The installer reuses your panel's TLS cert if found; otherwise pass
-    ${DIM}--cert /path/fullchain.pem --key /path/privkey.pem${RST}. Behind Cloudflare, use a
-    Cloudflare-supported HTTPS port (e.g. ${DIM}--port 2096${RST}) or grey-cloud the record.
+  Verify on the server:  ${DIM}curl -s http://127.0.0.1:$PORT/status.json${RST}
 EOF
 fi
 cat <<EOF

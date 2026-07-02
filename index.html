@@ -41,6 +41,11 @@
   data-emails="{{ range $i, $e := .emails }}{{ if $i }}, {{ end }}{{ $e }}{{ end }}"
   data-datepicker="{{ .datepicker }}"></template>
 
+<!-- Live server stats are injected here by the stats daemon (scripts/pxn_stats.py)
+     and travel with the page itself — same origin, no extra port, panel-safe.
+     Left as {} when no daemon is running. -->
+<script id="pxn-stats-embed" type="application/json">{}</script>
+
 <style>
 /* ============================ Design tokens ============================ */
 :root{
@@ -751,32 +756,56 @@ function applyStats(d){
   $("region").textContent   = d.region ? d.region : (FALLBACK_REGION || "—");
 }
 
+// A datum is "fresh" if the daemon stamped it within the last ~30s. Stale embeds
+// (e.g. a panel that caches the theme) are ignored so we fall back to a live source.
+function fresh(d){ return d && typeof d.cpu!=="undefined" && d.ts && (Date.now()/1000 - d.ts) < 30; }
+function readEmbed(root){
+  try{ var el=root.getElementById("pxn-stats-embed"); if(!el) return null;
+    return JSON.parse((el.textContent||"{}").trim());
+  }catch(e){ return null; }
+}
+
+// 1) inline embed already in this page — instant, same-origin, no request
+(function(){ var d=readEmbed(document); if(fresh(d)) applyStats(d); })();
+
 var statsUrlOk=null, pollTimer;
 function scheduleNext(){ clearTimeout(pollTimer); pollTimer=setTimeout(fetchStats,POLL_MS); }
+
+// 2) re-fetch our OWN page (same origin, any proxy/CF, no extra port) and read
+//    the freshly-injected embed from it.
+function trySelf(cb){
+  var u=location.href.split("#")[0];
+  u+=(u.indexOf("?")===-1?"?":"&")+"_h="+Date.now();
+  fetch(u,{headers:{"Accept":"text/html"},cache:"no-store"})
+    .then(function(r){ return r.ok? r.text() : Promise.reject(); })
+    .then(function(html){
+      var doc=new DOMParser().parseFromString(html,"text/html");
+      var d=readEmbed(doc);
+      if(fresh(d)){ applyStats(d); cb(true); } else cb(false);
+    }).catch(function(){ cb(false); });
+}
+// 3) direct JSON sources — dedicated stats port, then same-origin siblings
+function tryUrls(cb){
+  var urls = statsUrlOk? [statsUrlOk] : STATS_URLS, i=0;
+  (function nx(){
+    if(i>=urls.length){ cb(false); return; }
+    var base=urls[i++], u=base+(base.indexOf("?")===-1?"?t=":"&t=")+Date.now();
+    fetch(u,{cache:"no-store"}).then(function(r){ if(!r.ok) throw 0; return r.json(); })
+      .then(function(d){ statsUrlOk=base; applyStats(d); cb(true); })
+      .catch(function(){ nx(); });
+  })();
+}
 function fetchStats(){
-  var urls = statsUrlOk? [statsUrlOk] : STATS_URLS;
-  var tried=0;
-  function tryNext(){
-    if(tried>=urls.length){            // no stats source reachable this round
-      if(!hasReal) setSource(false);   // never fabricate values
-      scheduleNext(); return;
-    }
-    var base=urls[tried++];
-    var url=base+(base.indexOf("?")===-1?"?t=":"&t=")+Date.now();
-    fetch(url,{cache:"no-store"}).then(function(res){
-      if(!res.ok) throw 0; return res.json();
-    }).then(function(d){
-      statsUrlOk=base; applyStats(d); scheduleNext();
-    }).catch(function(){ tryNext(); });
-  }
-  tryNext();
+  trySelf(function(ok){
+    if(ok){ scheduleNext(); return; }
+    tryUrls(function(ok2){ if(!ok2 && !hasReal) setSource(false); scheduleNext(); });
+  });
 }
 
 /* honest empty state, then poll for real data */
 $("provider").textContent = FALLBACK_PROVIDER || "—";
 $("region").textContent   = FALLBACK_REGION || "—";
-setSource(false);
-renderEmpty();
+if(!hasReal){ setSource(false); renderEmpty(); }
 fetchStats();
 
 /* ---------- latency check ---------- */
