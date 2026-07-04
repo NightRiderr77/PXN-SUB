@@ -1,6 +1,6 @@
 <div align="center">
 
-# PXN Shield — Custom Subscription Page for 3X-UI
+# PXN SUB — Custom Subscription Page for 3X-UI
 
 A single-file, self-contained subscription page for [3X-UI](https://github.com/MHSanaei/3x-ui),
 styled in the **PXN Stores LK** brand. Monochrome, premium, animated — with a live
