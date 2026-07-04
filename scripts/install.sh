@@ -6,7 +6,7 @@
 # stats server that the page auto-discovers — no reverse proxy, no panel changes.
 #
 # One-liner (downloads everything):
-#   bash <(curl -Ls https://raw.githubusercontent.com/NightRider322/PXN-SUB/main/scripts/install.sh)
+#   bash <(curl -Ls https://raw.githubusercontent.com/NightRiderr77/PXN-SUB/main/scripts/install.sh)
 # Or from a clone:
 #   sudo ./scripts/install.sh
 #
@@ -62,7 +62,7 @@ done
 [ "$(id -u)" -eq 0 ] || die "Please run as root (sudo)."
 
 # ---- locate source files (clone or download) ---------------------------------
-REPO="${REPO:-NightRider322/PXN-SUB}"
+REPO="${REPO:-NightRiderr77/PXN-SUB}"
 BRANCH="${BRANCH:-main}"
 RAW_BASE="https://raw.githubusercontent.com/$REPO/$BRANCH"
 SCRIPT_DIR="$(cd "$(dirname "$0")" 2>/dev/null && pwd || echo /nonexistent)"

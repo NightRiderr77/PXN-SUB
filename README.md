@@ -46,19 +46,19 @@ set your real provider/region in the `FALLBACK_*` constants near the top of `ind
 One line, as root on your VPS:
 
 ```bash
-bash <(curl -Ls https://raw.githubusercontent.com/NightRider322/PXN-SUB/main/scripts/install.sh)
+bash <(curl -Ls https://raw.githubusercontent.com/NightRiderr77/PXN-SUB/main/scripts/install.sh)
 ```
 
 The installer auto-downloads the page and daemon when run this way. Pass flags after a `--`:
 
 ```bash
-bash <(curl -Ls https://raw.githubusercontent.com/NightRider322/PXN-SUB/main/scripts/install.sh) --no-stats
+bash <(curl -Ls https://raw.githubusercontent.com/NightRiderr77/PXN-SUB/main/scripts/install.sh) --no-stats
 ```
 
 Or clone and run it from the repo (same result):
 
 ```bash
-git clone https://github.com/NightRider322/PXN-SUB.git
+git clone https://github.com/NightRiderr77/PXN-SUB.git
 cd PXN-SUB
 sudo ./scripts/install.sh
 ```

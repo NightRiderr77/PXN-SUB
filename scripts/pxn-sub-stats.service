@@ -1,6 +1,6 @@
 [Unit]
 Description=PXN Shield subscription stats server
-Documentation=https://github.com/NightRider322/PXN-SUB
+Documentation=https://github.com/NightRiderr77/PXN-SUB
 After=network-online.target
 Wants=network-online.target
 
