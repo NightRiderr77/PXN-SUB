@@ -17,6 +17,7 @@
 # same-origin fallback.
 #
 # Flags:
+#   --brandless       Install the unbranded page (for resold servers).
 #   --no-stats        Page only (no stats server).
 #   --port N          Stats server port            (default: 8788)
 #   --xui-dir PATH    3X-UI install dir            (default: /usr/local/x-ui)
@@ -39,9 +40,10 @@ fetch(){ if command -v curl >/dev/null 2>&1; then curl -fsSL "$1" -o "$2"
 
 # ---- args --------------------------------------------------------------------
 WITH_STATS=1; PORT=8788; XUI_DIR="/usr/local/x-ui"; THEME_DIR=""; IFACE="auto"
-ISP=""; REGION=""; GEO_LOOKUP=1; CERT=""; KEY=""; NO_TLS=0
+ISP=""; REGION=""; GEO_LOOKUP=1; CERT=""; KEY=""; NO_TLS=0; BRANDLESS=0
 while [ $# -gt 0 ]; do
   case "$1" in
+    --brandless) BRANDLESS=1;;
     --no-stats) WITH_STATS=0;;
     --port) PORT="$2"; shift;;
     --xui-dir) XUI_DIR="$2"; shift;;
@@ -87,7 +89,39 @@ info "Theme dir : $THEME_DIR"
 mkdir -p "$THEME_DIR"
 [ -f "$THEME_DIR/index.html" ] && cp -f "$THEME_DIR/index.html" "$THEME_DIR/index.html.bak.$(date +%s)" && info "Backed up existing index.html"
 install -m 644 "$REPO_ROOT/index.html" "$THEME_DIR/index.html"
-info "Installed page -> $THEME_DIR/index.html"
+
+# ---- brandless -------------------------------------------------------------
+# Deleted, not hidden. CSS could hide the header, the buttons and the footer in
+# one rule, but the markup would still carry our domain and WhatsApp number, and
+# a customer on a reseller's server only has to open view-source. So the
+# <!--brand-->..<!--/brand--> blocks come out of the file, and the logo goes with
+# them — it's a ~18KB base64 blob no stylesheet can un-embed.
+#
+# PXN_BRAND=0 stays for what's left: the theme toggle needs to sit right when the
+# lockup beside it is gone, and Copy Subscription Link needs the full row once
+# it's the only action.
+#
+# Not scrubbed: internal ids like pxn-data and pxn-stats-embed. The page and the
+# stats daemon both find each other by those names, so renaming them here would
+# break live stats on exactly the servers this flag is for.
+if [ "$BRANDLESS" -eq 1 ]; then
+  T="$THEME_DIR/index.html"
+  sed -i \
+    -e '/<!--brand-->/,/<!--\/brand-->/d' \
+    -e 's/var PXN_BRAND=1;/var PXN_BRAND=0;/' \
+    -e 's|<title>.*</title>|<title>Subscription</title>|' \
+    -e 's|^  --logo:url("data:image/png;base64,[^"]*");|  --logo:none;|' \
+    -e 's|customer-001@pxnstores\.lk|customer-001@example.com|' \
+    "$T"
+  # Better to fail loudly than to hand a reseller a page that still says PXN.
+  grep -q 'var PXN_BRAND=0;' "$T" || die "Brandless rewrite failed — refusing to install a half-branded page."
+  if grep -qiE 'pxnstores|PXN STORES|wa\.me/' "$T"; then
+    die "Brandless rewrite left brand strings behind — refusing to install."
+  fi
+  info "Installed page -> $T ${DIM}(brandless)${RST}"
+else
+  info "Installed page -> $THEME_DIR/index.html"
+fi
 
 # ---- stats server ------------------------------------------------------------
 if [ "$WITH_STATS" -eq 1 ]; then

@@ -7,8 +7,23 @@
 <meta name="color-scheme" content="dark light" />
 <title>PXN Stores LK — Subscription</title>
 
+<!-- ===================== Brand switch =====================
+     One page, two faces. Branded is the default; the installer's --brandless
+     flag rewrites the 1 below to a 0 and strips the logo, and everything that
+     names us disappears: the header lockup, the guides and support buttons,
+     and the footer.
+
+     It runs here, in <head>, rather than with the rest of the script at the
+     bottom — by the time that runs the header has already painted, and a
+     reseller's customer would see our name flash up and vanish.
+
+     Kept as a runtime switch rather than a second copy of the file: two 900-line
+     pages drift apart the first time either one is fixed.
+========================================================== -->
+<script>var PXN_BRAND=1;(function(){if(!PXN_BRAND){document.documentElement.setAttribute("data-brand","off");document.title="Subscription";}})();</script>
+
 <!--
-  PXN SHIELD — Custom subscription page for 3X-UI
+  Custom subscription page for 3X-UI
   Single self-contained file. Drop into your "Sub Theme Directory".
   Uses only the documented 3X-UI html/template variables.
   Server Monitor / Infrastructure data is progressively enhanced from an
@@ -110,6 +125,20 @@ body{
 .brand-meta{display:flex;align-items:center;gap:12px;min-width:0}
 .brand-divider{width:1px;height:26px;background:var(--line-strong)}
 .brand-name{font-weight:600;font-size:15px;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* Brandless. Set by the head script before first paint, so nothing named
+   flashes up first. The theme toggle stays: it's a page control, not a mark. */
+[data-brand="off"] .brand,
+[data-brand="off"] #guidesBtn,
+[data-brand="off"] #supportBtn,
+[data-brand="off"] .foot{display:none}
+[data-brand="off"] .top{justify-content:flex-end}
+/* The copy button is the only action left, so it stops being half a row. */
+[data-brand="off"] .actions{grid-template-columns:1fr}
+/* No logo to float, so the preloader gets a plain ring instead of an empty box. */
+[data-brand="off"] .pre-logo{width:34px;height:34px;background:none;border-radius:50%;
+  border:2px solid var(--line-strong);border-top-color:var(--text);animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
 .icon-btn{
   width:42px;height:42px;border-radius:12px;border:1px solid var(--line);
   background:var(--surface-2);color:var(--text-dim);display:grid;place-items:center;
@@ -314,6 +343,7 @@ body{
 
   <!-- Header -->
   <header class="top reveal" style="animation-delay:.02s">
+    <!--brand-->
     <div class="brand">
       <div class="logo" role="img" aria-label="PXN Stores LK"></div>
       <div class="brand-meta">
@@ -321,6 +351,7 @@ body{
         <div class="brand-name" id="brandName">PXN STORES LK</div>
       </div>
     </div>
+    <!--/brand-->
     <button class="icon-btn" id="themeToggle" aria-label="Toggle theme" title="Toggle theme">
       <svg id="themeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>
@@ -469,6 +500,7 @@ body{
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
       <span id="copySubLabel">Copy Subscription Link</span>
     </button>
+    <!--brand-->
     <a class="btn" id="guidesBtn" href="https://www.pxnstores.lk/v2ray/setup-guides" target="_blank" rel="noopener">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
       Setup Guides &amp; Apps
@@ -477,13 +509,16 @@ body{
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-8.9 8.4 8.5 8.5 0 0 1-3.9-.9L3 20l1.1-4.1A8.38 8.38 0 0 1 3.2 12a8.5 8.5 0 0 1 8.4-8.5 8.38 8.38 0 0 1 9.4 8z"/></svg>
       WhatsApp Support
     </a>
+    <!--/brand-->
   </section>
 
+  <!--brand-->
   <footer class="foot reveal" style="animation-delay:.38s">
     <span>© 2026 PXN STORES LK. All rights reserved.</span>
     <span class="foot-sep">·</span>
     <a class="foot-link" href="https://pxnstores.lk" target="_blank" rel="noopener">pxnstores.lk</a>
   </footer>
+  <!--/brand-->
 </main>
 
 <div class="toast" id="toast"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span id="toastMsg">Copied</span></div>
@@ -596,7 +631,10 @@ var D = {
 };
 
 /* ---------- header / brand ---------- */
-if(D.title){ $("brandName").textContent=D.title; }
+/* Guarded because the brandless build deletes the element. Unguarded, a panel
+   that sets a subscription title would throw here and take the rest of the
+   script with it — ring, stats and copy button all dead. */
+if(D.title && $("brandName")){ $("brandName").textContent=D.title; }
 
 /* ---------- status + plan ---------- */
 var ro=relTime(D.lastOnline);
@@ -691,8 +729,8 @@ $("copySub").addEventListener("click",function(){
   }).catch(function(){ toast("Couldn't copy — long-press the link"); });
 });
 
-/* support url override from panel */
-if(D.support){ $("supportBtn").setAttribute("href",D.support); }
+/* support url override from panel — absent in the brandless build */
+if(D.support && $("supportBtn")){ $("supportBtn").setAttribute("href",D.support); }
 
 /* ============================================================
    Server monitor + infrastructure — REAL data only.

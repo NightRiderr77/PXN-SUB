@@ -20,7 +20,8 @@ monitoring (CPU / RAM / network) and infrastructure insights.
 - **Server Monitor** — CPU, memory, upload & download speed with live sparklines. **Real data only**: when the optional collector is installed the panel goes `live`; otherwise it shows `—` and an `offline` chip (never fabricated numbers).
 - **Infrastructure Insights** — provider, region, and a **real** client→server latency check (HEAD request, color-coded green / amber / red).
 - **Micro-interactions** — count-up numbers, ring stroke-draw, animated sparklines, copy-to-clipboard with feedback, hover lifts, preloader, light/dark toggle. Respects `prefers-reduced-motion`.
-- **Branded actions** — Copy Subscription Link, Setup Guides & Apps, WhatsApp Support.
+- **Actions** — Copy Subscription Link, plus Setup Guides & Apps and WhatsApp Support on the branded build.
+- **A brandless build** — same page with nothing that names us, for servers you hand to resellers. One flag, see below.
 
 > Built only on 3X-UI's **documented** Go `html/template` variables, so it works on a
 > stock panel with **no binary patching**. The live server stats are layered on top via
@@ -43,16 +44,27 @@ set your real provider/region in the `FALLBACK_*` constants near the top of `ind
 
 ## Full install (page + real server stats)
 
-One line, as root on your VPS:
+Two builds, one file. Run **one** of these as root on your VPS.
+
+**Branded** — our own servers. Header lockup, Setup Guides, WhatsApp Support, footer.
 
 ```bash
 bash <(curl -Ls https://raw.githubusercontent.com/NightRiderr77/PXN-SUB/main/scripts/install.sh)
 ```
 
-The installer auto-downloads the page and daemon when run this way. Pass flags after a `--`:
+**Brandless** — servers handed to resellers. Nothing identifies us, anywhere.
 
 ```bash
-bash <(curl -Ls https://raw.githubusercontent.com/NightRiderr77/PXN-SUB/main/scripts/install.sh) --no-stats
+bash <(curl -Ls https://raw.githubusercontent.com/NightRiderr77/PXN-SUB/main/scripts/install.sh) --brandless
+```
+
+Everything else is identical: usage ring, data overview, server monitor, latency
+check, theme toggle and Copy Subscription Link all behave exactly the same.
+
+The installer auto-downloads the page and daemon when run this way. Flags stack:
+
+```bash
+bash <(curl -Ls https://raw.githubusercontent.com/NightRiderr77/PXN-SUB/main/scripts/install.sh) --brandless --no-stats
 ```
 
 Or clone and run it from the repo (same result):
@@ -63,7 +75,41 @@ cd PXN-SUB
 sudo ./scripts/install.sh
 ```
 
-To update later, just run the one-liner again.
+To update later, just run the one-liner again — with the same brand flag you used
+the first time, or the server flips back.
+
+---
+
+## What `--brandless` actually removes
+
+`index.html` is the single source for both builds; there is no second copy to keep
+in sync. The installer edits its copy in the theme directory:
+
+| Removed | How |
+|---|---|
+| Header logo + **PXN STORES LK** | `<!--brand-->` block deleted from the markup |
+| **Setup Guides & Apps**, **WhatsApp Support** | same — including the `pxnstores.lk` and `wa.me` links |
+| Footer (**© PXN STORES LK** · pxnstores.lk) | same |
+| Tab title | rewritten to `Subscription` |
+| The embedded logo | the `--logo` data-URI is replaced, dropping ~18 KB |
+
+They're **deleted, not hidden**. CSS could hide all of it in one rule, but the
+markup would still carry our domain and phone number, and a customer only has to
+open view-source. The installer aborts rather than install a page that still
+matches `pxnstores`, `PXN STORES` or `wa.me`.
+
+The theme toggle stays — it's a page control, not a mark. With the lockup gone it
+sits right, and Copy Subscription Link takes the full row.
+
+Internal ids (`pxn-data`, `pxn-stats-embed`) are left alone: the page and the
+stats daemon find each other by those names, so renaming them would break live
+stats on exactly the servers this flag is for.
+
+Check any install:
+
+```bash
+grep -c 'var PXN_BRAND=0;' /usr/local/x-ui/pxn_sub/index.html   # 1 = brandless
+```
 
 This will:
 
