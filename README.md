@@ -1,238 +1,117 @@
 <div align="center">
 
-# PXN SUB — Custom Subscription Page for 3X-UI
+<img src="docs/banner.png" alt="PXN SUB — a subscription page for 3X-UI" width="100%">
 
-A single-file, self-contained subscription page for [3X-UI](https://github.com/MHSanaei/3x-ui),
-styled in the **PXN Stores LK** brand. Monochrome, premium, animated — with a live
-usage ring, real client→server latency, and an optional daemon for **real** server
-monitoring (CPU / RAM / network) and infrastructure insights.
+<br><br>
 
-`index.html` · zero CDN · airgap-safe · drop into your *Sub Theme Directory*
+**A single-file subscription page for [3X-UI][3xui].**
+Usage ring, real latency, and optional live CPU / RAM / network from the box itself.
+
+<sub>One `index.html` · no CDN · airgap-safe · no binary patching</sub>
 
 </div>
 
 ---
 
-## What you get
+## Install
 
-- **Subscription overview** — plan name, active/disabled state, last-online, expiry with a days-left chip, and the usage ring (used / total) driven by the real panel data.
-- **Data Usage Overview** — upload, download, used, remaining, plus an animated progress bar.
-- **Server Monitor** — CPU, memory, upload & download speed with live sparklines. **Real data only**: when the optional collector is installed the panel goes `live`; otherwise it shows `—` and an `offline` chip (never fabricated numbers).
-- **Infrastructure Insights** — provider, region, and a **real** client→server latency check (HEAD request, color-coded green / amber / red).
-- **Micro-interactions** — count-up numbers, ring stroke-draw, animated sparklines, copy-to-clipboard with feedback, hover lifts, preloader, light/dark toggle. Respects `prefers-reduced-motion`.
-- **Actions** — Copy Subscription Link, plus Setup Guides & Apps and WhatsApp Support on the branded build.
-- **A brandless build** — same page with nothing that names us, for servers you hand to resellers. One flag, see below.
-
-> Built only on 3X-UI's **documented** Go `html/template` variables, so it works on a
-> stock panel with **no binary patching**. The live server stats are layered on top via
-> progressive enhancement — if the data isn't there, the page still works.
-
----
-
-## Quick start (page only — 2 minutes)
-
-1. Copy `index.html` to a folder on your server, e.g. `/usr/local/x-ui/pxn_sub/`.
-2. In the panel: **Settings → Subscription → Sub Theme Directory** → set it to that folder's absolute path.
-3. Save, then restart the panel: `x-ui restart`.
-4. Open any subscription link — you'll see the PXN page.
-
-In this mode the **latency check is still real**; the Server Monitor shows `—` /
-`offline` (no fake numbers) until you add the stats daemon below. You can optionally
-set your real provider/region in the `FALLBACK_*` constants near the top of `index.html`.
-
----
-
-## Full install (page + real server stats)
-
-Two builds, one file. Run **one** of these as root on your VPS.
-
-**Branded** — our own servers. Header lockup, Setup Guides, WhatsApp Support, footer.
+Copy the page in, point the panel at it, restart:
 
 ```bash
 bash <(curl -Ls https://raw.githubusercontent.com/NightRiderr77/PXN-SUB/main/scripts/install.sh)
 ```
 
-**Brandless** — servers handed to resellers. Nothing identifies us, anywhere.
+Then set **Settings → Subscription → Sub Theme Directory** to the folder it
+names, and run `x-ui restart`.
+
+That is the whole thing. The installer also sets up a small collector so the
+server-monitor panel shows real numbers.
+
+<details>
+<summary><b>Other install modes</b></summary>
+
+<br>
+
+**Brandless** — for servers you hand to resellers. Nothing identifies the
+operator anywhere in the markup:
 
 ```bash
 bash <(curl -Ls https://raw.githubusercontent.com/NightRiderr77/PXN-SUB/main/scripts/install.sh) --brandless
 ```
 
-Everything else is identical: usage ring, data overview, server monitor, latency
-check, theme toggle and Copy Subscription Link all behave exactly the same.
-
-The installer auto-downloads the page and daemon when run this way. Flags stack:
+**Brandless, page only** — no collector, no daemon:
 
 ```bash
 bash <(curl -Ls https://raw.githubusercontent.com/NightRiderr77/PXN-SUB/main/scripts/install.sh) --brandless --no-stats
 ```
 
-Or clone and run it from the repo (same result):
+**By hand** — copy `index.html` to e.g. `/usr/local/x-ui/pxn_sub/`, point the
+panel's *Sub Theme Directory* at it, `x-ui restart`. Latency is still real; the
+server monitor reads `—` until the collector is installed.
+
+**Uninstall:**
 
 ```bash
-git clone https://github.com/NightRiderr77/PXN-SUB.git
-cd PXN-SUB
-sudo ./scripts/install.sh
+sudo ./scripts/uninstall.sh              # collector + theme
+sudo ./scripts/uninstall.sh --keep-theme # collector only
 ```
 
-To update later, just run the one-liner again — with the same brand flag you used
-the first time, or the server flips back.
+Then clear the *Sub Theme Directory* field and `x-ui restart`.
 
----
+</details>
 
-## What `--brandless` actually removes
+## What it shows
 
-`index.html` is the single source for both builds; there is no second copy to keep
-in sync. The installer edits its copy in the theme directory:
-
-| Removed | How |
+|  |  |
 |---|---|
-| Header logo + **PXN STORES LK** | `<!--brand-->` block deleted from the markup |
-| **Setup Guides & Apps**, **WhatsApp Support** | same — including the `pxnstores.lk` and `wa.me` links |
-| Footer (**© PXN STORES LK** · pxnstores.lk) | same |
-| Tab title | rewritten to `Subscription` |
-| The embedded logo | the `--logo` data-URI is replaced, dropping ~18 KB |
+| 📊 **The plan** | Name, active or disabled, last online, expiry with a days-left chip, and a usage ring driven by real panel data. |
+| 📈 **Data used** | Upload, download, used and remaining, with a progress bar. |
+| 🖥️ **Server monitor** | CPU, memory and network with live sparklines — **only when the collector is running.** Otherwise `—` and an `offline` chip. |
+| 🌍 **Infrastructure** | Provider, region, and a real client→server latency check, colour-coded. |
+| 📋 **Actions** | Copy the subscription link, plus setup guides and support on the branded build. |
 
-They're **deleted, not hidden**. CSS could hide all of it in one rule, but the
-markup would still carry our domain and phone number, and a customer only has to
-open view-source. The installer aborts rather than install a page that still
-matches `pxnstores`, `PXN STORES` or `wa.me`.
+Built only on 3X-UI's **documented** template variables, so it runs on a stock
+panel. The live stats are layered on top — if the data is not there, the page
+still works.
 
-The theme toggle stays — it's a page control, not a mark. With the lockup gone it
-sits right, and Copy Subscription Link takes the full row.
+**No invented numbers.** Where a figure cannot be measured it is shown as `—`,
+never as a plausible-looking value.
 
-Internal ids (`pxn-data`, `pxn-stats-embed`) are left alone: the page and the
-stats daemon find each other by those names, so renaming them would break live
-stats on exactly the servers this flag is for.
+## Brandless means deleted, not hidden
 
-Check any install:
+The installer removes the logo, the support links, the footer and the tab title
+from its copy of the markup. It does not hide them with CSS — the markup would
+still carry the domain and phone number, and anyone can open view-source. The
+installer aborts rather than install a page that still matches `pxnstores`,
+`PXN STORES` or `wa.me`.
 
-```bash
-grep -c 'var PXN_BRAND=0;' /usr/local/x-ui/pxn_sub/index.html   # 1 = brandless
-```
+## Requirements
 
-This will:
+3X-UI with subscriptions enabled, and root on the VPS for the collector. The
+page itself needs nothing but the panel.
 
-- copy `index.html` into the theme dir (default `/usr/local/x-ui/pxn_sub/`),
-- install a tiny **stats server** (`pxn_stats.py`, Python 3 stdlib) + systemd service `pxn-sub-stats`,
-- collect real CPU / RAM / network every 2s (plus a one-time geo lookup for ISP + region),
-- deliver it two ways: **embedded into the theme's `index.html`** (same-origin, panel-safe) and served with CORS on its own port,
-- open that port in `ufw`/`firewalld` if active, and print the one manual panel step.
+<details>
+<summary><b>How the live stats reach the page</b></summary>
 
-Installer flags:
+<br>
 
-| Flag | Default | Purpose |
-|------|---------|---------|
-| `--no-stats` | off | Install the page only, skip the stats server |
-| `--port N` | `8788` | Port the stats server listens on |
-| `--xui-dir PATH` | `/usr/local/x-ui` | 3X-UI install directory |
-| `--theme-dir PATH` | `<xui-dir>/pxn_sub` | Where the page + status.json live |
-| `--iface NAME` | `auto` | Network interface for speed stats |
-| `--isp "NAME"` | geo lookup | Force the provider label |
-| `--region "NAME"` | geo lookup | Force the region label |
-| `--no-geo` | off | Disable the one-time external geo call |
-| `--cert PATH --key PATH` | auto | Serve stats over HTTPS with this cert/key |
-| `--no-tls` | off | Force plain HTTP even if a panel cert is found |
+A small Python service samples the box and writes a `status.json` beside the
+theme; the page fetches it on a timer. No reverse proxy, no panel patching,
+nothing listening on a new port. See [`scripts/pxn_stats.py`](scripts/pxn_stats.py)
+and [`docs/design.md`](docs/design.md).
 
-Manage the server:
+</details>
 
-```bash
-systemctl status pxn-sub-stats
-journalctl -u pxn-sub-stats -f
-```
+## Licence
 
-### How live stats reach the page (automatic — no reverse proxy, panel-safe)
-
-Stock 3X-UI does **not** serve sibling files from the theme directory (`/sub/.../status.json`
-returns 404), and patching the x-ui binary — how 3X-SUB does it — is the one thing that can
-break the panel. So the daemon uses two channels the page tries in order, and **neither
-touches 3X-UI**:
-
-1. **Same-origin embed (primary).** The daemon writes the live JSON straight into your
-   theme's `index.html` (inside a `<script id="pxn-stats-embed">` tag, atomically). The stats
-   then travel *with the page*, on the same origin/port as your sub link — so it works behind
-   Cloudflare, reverse proxies, any port, with no CORS and no mixed content. The page reads it
-   on load and refreshes by re-fetching its own URL.
-   **After install you must `x-ui restart`** so the panel serves the freshly-updated theme.
-
-2. **Dedicated port (fallback).** The daemon also serves `status.json` with CORS on its own
-   port (default `8788`); the page auto-builds `<page-protocol>//<host>:8788/status.json`.
-   Used if the panel caches the theme instead of re-reading it. To use this channel:
-   - **Open the port** — the installer handles `ufw`/`firewalld`; also open it in your VPS
-     provider's firewall/security group.
-   - **HTTPS sub page?** The installer reuses your panel's TLS cert automatically (read from
-     the 3X-UI DB) so the port serves HTTPS with a valid cert. Else pass `--cert … --key …`.
-   - **Behind Cloudflare?** Use a [CF-supported HTTPS port](https://developers.cloudflare.com/fundamentals/reference/network-ports/)
-     (`--port 2096`/`2083`/`2087`/`2053`) or grey-cloud the record.
-
-Prefer to point at your own URL instead? Set `STATS_OVERRIDE` in `index.html`. Or run
-`--no-stats` to keep it page-only (Server Monitor reads `—`).
+MIT — see [LICENSE](LICENSE). Live-stats approach informed by a read-only study
+of [3X-SUB][3xsub]'s collector pattern; no code copied.
 
 ---
 
-## Customising
+<div align="center">
+<sub>Built by <b><a href="https://www.pxnstores.lk">PXN Stores LK</a></b> in Sri Lanka</sub>
+</div>
 
-Everything lives at the top of the `<script>` block in `index.html`:
-
-```js
-var STATS_PORT = 8788;        // must match the installer's --port; the page auto-builds the URL
-var STATS_OVERRIDE = "";      // optional: force one exact stats URL (skips auto-discovery)
-var FALLBACK_PROVIDER = "";   // optional: your real provider, shown without the daemon ("" = "—")
-var FALLBACK_REGION   = "";   // optional: your real region ("" = "—")
-var POLL_MS = 2000;           // stats refresh interval
-```
-
-- **Brand name** — the header uses the panel's `{{ .subTitle }}` if set, else `PXN STORES LK`. Edit `#brandName` to hard-code it.
-- **Links** — WhatsApp `https://wa.me/94761546544` and Setup Guides `https://www.pxnstores.lk/v2ray/setup-guides` are in the actions section. The WhatsApp button auto-uses the panel's `{{ .subSupportUrl }}` if configured.
-- **Theme** — monochrome tokens are CSS variables under `:root` (and `[data-theme="light"]`). The accent is intentionally pure white; the only colour is the green "live" dot.
-
----
-
-## 3X-UI template variables used
-
-The page reads these via `data-*` attributes on the `#pxn-data` `<template>`:
-
-`sId` · `enabled` · `download` · `upload` · `used` · `total` · `remained` ·
-`downloadByte` · `uploadByte` · `totalByte` · `expire` (unix s) · `lastOnline` (unix ms) ·
-`subUrl` · `subJsonUrl` · `subClashUrl` · `subTitle` · `subSupportUrl` · `datepicker`
-
-Used (%) and remaining are derived from the byte fields; expiry date & days-left are computed
-from `expire`; online state is computed from `lastOnline`.
-
-> Open `index.html` directly (outside the panel) and it renders with realistic **sample data**
-> automatically — handy for previewing and screenshots.
-
----
-
-## Uninstall
-
-```bash
-sudo ./scripts/uninstall.sh            # removes daemon + theme
-sudo ./scripts/uninstall.sh --keep-theme
-```
-
-Then clear the **Sub Theme Directory** field in the panel and run `x-ui restart`.
-
----
-
-## Project layout
-
-```
-pxn-sub/
-├─ index.html                     # the whole page (CSS + JS inline)
-├─ scripts/
-│  ├─ install.sh                  # installs page + optional stats daemon
-│  ├─ uninstall.sh
-│  ├─ pxn_stats.py                # collector + CORS stats server → status.json
-│  └─ pxn-sub-stats.service       # systemd unit
-├─ docs/design.md                 # design + architecture notes
-└─ README.md
-```
-
----
-
-## Credits & licence
-
-Brand: **PXN Stores LK**. Live-stats mechanism inspired by the approach used in
-[3X-SUB](https://github.com/xLordGrim/3X-SUB) (read-only study of its `status.json`
-collector pattern; no code copied). Licensed under the MIT License — see [LICENSE](LICENSE).
+[3xui]: https://github.com/MHSanaei/3x-ui
+[3xsub]: https://github.com/xLordGrim/3X-SUB
