@@ -75,7 +75,7 @@
   --text-dim:#b7bcc4;
   --muted:#83888f;
   --faint:#565b62;
-  --accent:#ffffff;
+  --accent:#ffffff;--accent-ink:#08090a;
   --live:#3ad17a;
   --warn:#e3b341;
   --bad:#e5534b;
@@ -91,7 +91,7 @@
 [data-theme="light"]{
   --bg:#f3f3f1;--bg-grain:#efefec;--surface:#ffffff;--surface-2:#fafaf8;--surface-3:#f3f3f0;
   --line:rgba(0,0,0,.08);--line-strong:rgba(0,0,0,.14);
-  --text:#0c0d0e;--text-dim:#33373c;--muted:#6a6f75;--faint:#9aa0a6;--accent:#0c0d0e;
+  --text:#0c0d0e;--text-dim:#33373c;--muted:#6a6f75;--faint:#9aa0a6;--accent:#0c0d0e;--accent-ink:#ffffff;
 }
 
 *{box-sizing:border-box;margin:0;padding:0}
@@ -274,7 +274,10 @@ body{
 .btn svg{width:17px;height:17px;flex:none}
 .btn:hover{transform:translateY(-2px);border-color:rgba(255,255,255,.22)}
 .btn:active{transform:translateY(0) scale(.99)}
-.btn.primary{background:var(--accent);color:#08090a;border-color:transparent}
+/* The ink follows the accent. Hardcoded, it was near-black text on the
+   near-black light-theme accent — the one button on the page nobody could
+   read, and the one they came to press. */
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:transparent}
 .btn.primary:hover{filter:brightness(.92)}
 .btn.full{grid-column:1/-1}
 .btn.copy.ok{background:rgba(58,209,122,.12);border-color:rgba(58,209,122,.4);color:var(--live)}

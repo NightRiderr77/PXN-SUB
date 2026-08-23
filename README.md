@@ -9,6 +9,13 @@ Usage ring, real latency, and optional live CPU / RAM / network from the box its
 
 <sub>One `index.html` · no CDN · airgap-safe · no binary patching</sub>
 
+<br><br>
+
+<img src="docs/screenshots/dark.png" width="49%" alt="The subscription page in dark theme: plan name, usage ring, data totals, server monitor and infrastructure panels">
+<img src="docs/screenshots/light.png" width="49%" alt="The same page in light theme">
+
+<sub>Dark and light, from the toggle in the header. The server monitor reads <code>offline</code> until the collector is installed — it never invents a number.</sub>
+
 </div>
 
 ---
