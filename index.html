@@ -613,25 +613,44 @@ function animateNum(el,to,opts){
 /* ---------- read template data (with sample fallback for raw preview) ---------- */
 var tpl=$("pxn-data");
 function g(k){ return tpl?tpl.getAttribute("data-"+k):""; }
+var INF = "∞";
+/* SAMPLE is true only when this file is opened raw, with no Go render behind it.
+   Every demo value is gated on it, and has to be: 3X-UI sends an empty `remained`
+   for a client with no quota, and a per-field fallback turned that into the
+   mockup's "98.97 GB" — a made-up balance shown as the customer's own on every
+   unlimited subscription. On a live page a missing field now degrades to
+   something worked out from the bytes, or to nothing, never to demo data. */
 var SAMPLE = isTpl(g("total-byte")) && isTpl(g("total"));
+function pick(k,sample,live){ var v=g(k); return isTpl(v)? (SAMPLE?sample:live) : v; }
+function pickNum(k,sample,live){
+  var v=g(k); if(isTpl(v)) return SAMPLE?sample:live;
+  var n=Number(v); return isFinite(n)? n : (SAMPLE?sample:live);
+}
 var D = {
-  sid:        isTpl(g("sid"))? "1867cadf-bc03-4d5d-b618-121e2e79f768" : g("sid"),
+  sid:        pick("sid","1867cadf-bc03-4d5d-b618-121e2e79f768","—"),
   enabled:    isTpl(g("enabled"))? true : (g("enabled")==="true"),
   title:      isTpl(g("sub-title"))? "" : g("sub-title"),
-  upload:     isTpl(g("upload"))? "59.46 MB" : g("upload"),
-  download:   isTpl(g("download"))? "998.11 MB" : g("download"),
-  used:       isTpl(g("used"))? "1.03 GB" : g("used"),
-  total:      isTpl(g("total"))? "100 GB" : g("total"),
-  remained:   isTpl(g("remained"))? "98.97 GB" : g("remained"),
-  ub:         isTpl(g("upload-byte"))? 62349148 : Number(g("upload-byte")),
-  db:         isTpl(g("download-byte"))? 1046691512 : Number(g("download-byte")),
-  tb:         isTpl(g("total-byte"))? 107374182400 : Number(g("total-byte")),
-  expire:     isTpl(g("expire"))? Math.floor((Date.now()+28*86400000)/1000) : Number(g("expire")),
-  lastOnline: isTpl(g("last-online"))? Date.now()-15000 : Number(g("last-online")),
+  ub:         pickNum("upload-byte",62349148,0),
+  db:         pickNum("download-byte",1046691512,0),
+  tb:         pickNum("total-byte",107374182400,0),
+  expire:     pickNum("expire",Math.floor((Date.now()+28*86400000)/1000),0),
+  lastOnline: pickNum("last-online",Date.now()-15000,0),
   subUrl:     isTpl(g("sub-url"))? window.location.href : g("sub-url"),
   support:    isTpl(g("sub-support-url"))? "" : g("sub-support-url"),
-  emails:     isTpl(g("emails"))? "customer-001@pxnstores.lk" : g("emails")
+  emails:     pick("emails","customer-001@pxnstores.lk","")
 };
+
+/* A total of 0 bytes is how 3X-UI says unlimited. It prints the limit as ∞
+   but sends nothing for the balance, so Remaining is decided here: unlimited when
+   there is no quota, otherwise what the panel says, and failing that what is
+   actually left. */
+var usedBytes = (D.db||0)+(D.ub||0);
+var unlimited = !(D.tb > 0);
+D.upload   = pick("upload","59.46 MB",fmtBytes(D.ub));
+D.download = pick("download","998.11 MB",fmtBytes(D.db));
+D.used     = pick("used","1.03 GB",fmtBytes(usedBytes));
+D.total    = unlimited ? INF : pick("total","100 GB",fmtBytes(D.tb));
+D.remained = unlimited ? INF : pick("remained","98.97 GB",fmtBytes(Math.max(D.tb-usedBytes,0)));
 
 /* ---------- header / brand ---------- */
 /* Guarded because the brandless build deletes the element. Unguarded, a panel
@@ -658,8 +677,7 @@ if(ro.online){ chip.textContent="Online"; chip.classList.add("live"); }
 else { chip.textContent="Offline"; chip.classList.remove("live"); }
 
 /* ---------- usage numbers ---------- */
-var usedBytes=(D.db||0)+(D.ub||0);
-var pct = D.tb>0 ? Math.min(usedBytes/D.tb*100,100) : 0;
+var pct = unlimited ? 0 : Math.min(usedBytes/D.tb*100,100);
 
 $("ringUsed").textContent=D.used;
 $("ringOf").textContent="of "+D.total;
