@@ -52,9 +52,9 @@ bash <(curl -Ls https://raw.githubusercontent.com/NightRiderr77/PXN-SUB/main/scr
 bash <(curl -Ls https://raw.githubusercontent.com/NightRiderr77/PXN-SUB/main/scripts/install.sh) --brandless --no-stats
 ```
 
-**V2Ray face** — the same page wearing the shield mark and a `V2RAY USAGE`
-header instead of the store lockup. Nothing else changes; the guides, support
-and footer all stay:
+**V2Ray face** — brandless with a name on it. The shield mark and a
+`V2RAY USAGE` header in place of the store lockup, and the guides and support
+buttons and the footer removed along with everything else that names you:
 
 ```bash
 bash <(curl -Ls https://raw.githubusercontent.com/NightRiderr77/PXN-SUB/main/scripts/install.sh) --v2ray
@@ -95,7 +95,8 @@ never as a plausible-looking value.
 ## Brandless means deleted, not hidden
 
 The installer removes the logo, the support links, the footer and the tab title
-from its copy of the markup. It does not hide them with CSS — the markup would
+from its copy of the markup. `--v2ray` takes out the same links and footer, and
+keeps only the lockup, with a different mark and name in it. It does not hide them with CSS — the markup would
 still carry the domain and phone number, and anyone can open view-source. The
 installer aborts rather than install a page that still matches `pxnstores`,
 `PXN STORES` or `wa.me`.

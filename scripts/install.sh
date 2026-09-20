@@ -100,9 +100,9 @@ install -m 644 "$REPO_ROOT/index.html" "$THEME_DIR/index.html"
 # ---- brandless -------------------------------------------------------------
 # Deleted, not hidden. CSS could hide the header, the buttons and the footer in
 # one rule, but the markup would still carry our domain and WhatsApp number, and
-# a customer on a reseller's server only has to open view-source. So the
-# <!--brand-->..<!--/brand--> blocks come out of the file, and the logo goes with
-# them — it's a ~18KB base64 blob no stylesheet can un-embed.
+# a customer on a reseller's server only has to open view-source. So all three
+# <!--brand:*-->..<!--/brand--> blocks come out of the file, and the logo goes
+# with them — it's a ~18KB base64 blob no stylesheet can un-embed.
 #
 # PXN_BRAND=0 stays for what's left: the theme toggle needs to sit right when the
 # lockup beside it is gone, and Copy Subscription Link needs the full row once
@@ -114,7 +114,7 @@ install -m 644 "$REPO_ROOT/index.html" "$THEME_DIR/index.html"
 if [ "$BRANDLESS" -eq 1 ]; then
   T="$THEME_DIR/index.html"
   sed -i \
-    -e '/<!--brand-->/,/<!--\/brand-->/d' \
+    -e '/<!--brand:[a-z]*-->/,/<!--\/brand-->/d' \
     -e 's/var PXN_BRAND=1;/var PXN_BRAND=0;/' \
     -e 's|<title>.*</title>|<title>Subscription</title>|' \
     -e 's|^  --logo:url("data:image/png;base64,[^"]*");|  --logo:none;|' \
@@ -131,9 +131,10 @@ else
 fi
 
 # ---- the V2Ray face ---------------------------------------------------------
-# The same page wearing a different lockup: the shield mark, and V2RAY USAGE
-# where the store name normally sits. Nothing else moves — guides, support and
-# the footer all stay, because this is still our page. Only the header changes.
+# Brandless with a name on it: the shield mark and V2RAY USAGE where the store
+# lockup sits, and nothing else that names us. The guides and support buttons
+# and the footer come out exactly as --brandless takes them; only the lockup is
+# kept, and only after the mark and the name in it have been replaced.
 #
 # Swapped in here rather than switched at runtime, the same way --brandless
 # works, so the installed file carries exactly one logo. A runtime switch would
@@ -153,16 +154,25 @@ if [ "$V2RAY" -eq 1 ]; then
     /^  --logo:url\("data:image\/png;base64,/ { while ((getline l < f) > 0) print l; next }
     { print }' "$T" > "$T.tmp" && mv "$T.tmp" "$T"
 
+  # brand:lockup stays and gets renamed; brand:links and brand:foot go, the same
+  # way --brandless removes them — deleted, not hidden, so view-source carries
+  # no domain and no WhatsApp number either.
   sed -i \
+    -e '/<!--brand:links-->/,/<!--\/brand-->/d' \
+    -e '/<!--brand:foot-->/,/<!--\/brand-->/d' \
     -e 's|<title>.*</title>|<title>V2Ray Usage</title>|' \
     -e 's|aria-label="PXN Stores LK"|aria-label="V2Ray Usage"|' \
     -e 's|>PXN STORES LK<|>V2RAY USAGE<|' \
+    -e 's|customer-001@pxnstores\.lk|customer-001@example.com|' \
     "$T"
 
   # Half a face is worse than either whole one, so prove every part landed.
   grep -q '>V2RAY USAGE<' "$T" || die "V2Ray rewrite failed — the header still names the store."
   grep -qxF "$(cat "$LOGO_LINE")" "$T" || die "V2Ray rewrite failed — the shield mark is not embedded."
   [ "$(grep -c '^  --logo:url(' "$T")" -eq 1 ] || die "V2Ray rewrite failed — more than one logo in the page."
+  if grep -qiE 'pxnstores|PXN STORES|wa\.me/' "$T"; then
+    die "V2Ray rewrite left brand strings behind — refusing to install."
+  fi
   rm -f "$LOGO_LINE"
   info "Installed page -> $T ${DIM}(V2Ray face)${RST}"
 fi

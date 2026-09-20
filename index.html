@@ -13,10 +13,16 @@
      names us disappears: the header lockup, the guides and support buttons,
      and the footer.
 
-     --v2ray is the third, and the gentlest: the page stays whole and only the
-     lockup changes, to the shield mark and V2RAY USAGE. It needs no switch
-     here because nothing about the layout moves — the installer swaps the
-     logo blob and the name in place, so the file carries just one of each.
+     --v2ray is the third, and sits between the two: it keeps a lockup — the
+     shield mark and V2RAY USAGE — and drops everything else that names us,
+     the guides and support buttons and the footer along with them.
+
+     Which is why the three blocks below are labelled brand:lockup,
+     brand:links and brand:foot. --brandless deletes all three; --v2ray keeps
+     the first and deletes the rest, and it can only tell them apart if they
+     say which is which. Neither face needs a switch here, because no layout
+     moves: Copy Subscription Link is already grid-column:1/-1, so it fills
+     the row whether or not the other two buttons are beside it.
 
      It runs here, in <head>, rather than with the rest of the script at the
      bottom — by the time that runs the header has already painted, and a
@@ -351,7 +357,7 @@ body{
 
   <!-- Header -->
   <header class="top reveal" style="animation-delay:.02s">
-    <!--brand-->
+    <!--brand:lockup-->
     <div class="brand">
       <div class="logo" role="img" aria-label="PXN Stores LK"></div>
       <div class="brand-meta">
@@ -508,7 +514,7 @@ body{
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
       <span id="copySubLabel">Copy Subscription Link</span>
     </button>
-    <!--brand-->
+    <!--brand:links-->
     <a class="btn" id="guidesBtn" href="https://www.pxnstores.lk/v2ray/setup-guides" target="_blank" rel="noopener">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
       Setup Guides &amp; Apps
@@ -520,7 +526,7 @@ body{
     <!--/brand-->
   </section>
 
-  <!--brand-->
+  <!--brand:foot-->
   <footer class="foot reveal" style="animation-delay:.38s">
     <span>© 2026 PXN STORES LK. All rights reserved.</span>
     <span class="foot-sep">·</span>
