@@ -18,6 +18,7 @@
 #
 # Flags:
 #   --brandless       Install the unbranded page (for resold servers).
+#   --v2ray           Install the V2Ray face: shield mark + "V2RAY USAGE" header.
 #   --no-stats        Page only (no stats server).
 #   --port N          Stats server port            (default: 8788)
 #   --xui-dir PATH    3X-UI install dir            (default: /usr/local/x-ui)
@@ -40,10 +41,11 @@ fetch(){ if command -v curl >/dev/null 2>&1; then curl -fsSL "$1" -o "$2"
 
 # ---- args --------------------------------------------------------------------
 WITH_STATS=1; PORT=8788; XUI_DIR="/usr/local/x-ui"; THEME_DIR=""; IFACE="auto"
-ISP=""; REGION=""; GEO_LOOKUP=1; CERT=""; KEY=""; NO_TLS=0; BRANDLESS=0
+ISP=""; REGION=""; GEO_LOOKUP=1; CERT=""; KEY=""; NO_TLS=0; BRANDLESS=0; V2RAY=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --brandless) BRANDLESS=1;;
+    --v2ray) V2RAY=1;;
     --no-stats) WITH_STATS=0;;
     --port) PORT="$2"; shift;;
     --xui-dir) XUI_DIR="$2"; shift;;
@@ -61,6 +63,9 @@ while [ $# -gt 0 ]; do
   shift
 done
 [ -z "$THEME_DIR" ] && THEME_DIR="$XUI_DIR/pxn_sub"
+# --brandless deletes the lockup; --v2ray replaces it. Asking for both is a
+# mistake worth stopping for, not one to settle by guessing which was meant.
+[ "$BRANDLESS" -eq 1 ] && [ "$V2RAY" -eq 1 ] && die "--brandless and --v2ray cannot be combined."
 [ "$(id -u)" -eq 0 ] || die "Please run as root (sudo)."
 
 # ---- locate source files (clone or download) ---------------------------------
@@ -74,9 +79,11 @@ if [ -f "$SCRIPT_DIR/../index.html" ]; then
 else
   command -v curl >/dev/null 2>&1 || command -v wget >/dev/null 2>&1 || die "curl or wget is required."
   REPO_ROOT="$(mktemp -d)"; trap 'rm -rf "$REPO_ROOT"' EXIT
-  mkdir -p "$REPO_ROOT/scripts"
+  mkdir -p "$REPO_ROOT/scripts" "$REPO_ROOT/assets"
   info "Downloading files from $REPO@$BRANCH"
-  for f in index.html scripts/pxn_stats.py scripts/pxn-sub-stats.service; do
+  FILES="index.html scripts/pxn_stats.py scripts/pxn-sub-stats.service"
+  [ "$V2RAY" -eq 1 ] && FILES="$FILES assets/logo-v2ray.png"
+  for f in $FILES; do
     fetch "$RAW_BASE/$f" "$REPO_ROOT/$f" || die "Failed to download $f"
   done
 fi
@@ -121,6 +128,43 @@ if [ "$BRANDLESS" -eq 1 ]; then
   info "Installed page -> $T ${DIM}(brandless)${RST}"
 else
   info "Installed page -> $THEME_DIR/index.html"
+fi
+
+# ---- the V2Ray face ---------------------------------------------------------
+# The same page wearing a different lockup: the shield mark, and V2RAY USAGE
+# where the store name normally sits. Nothing else moves — guides, support and
+# the footer all stay, because this is still our page. Only the header changes.
+#
+# Swapped in here rather than switched at runtime, the same way --brandless
+# works, so the installed file carries exactly one logo. A runtime switch would
+# mean shipping both base64 blobs to every server so that one could be ignored.
+if [ "$V2RAY" -eq 1 ]; then
+  T="$THEME_DIR/index.html"
+  LOGO_PNG="$REPO_ROOT/assets/logo-v2ray.png"
+  [ -f "$LOGO_PNG" ] || die "Missing $LOGO_PNG — cannot install the V2Ray face."
+  command -v base64 >/dev/null 2>&1 || die "base64 is required for --v2ray."
+
+  # The blob goes in from a file rather than the right-hand side of an s|||.
+  # 10KB of base64 in a sed replacement is asking for trouble outside GNU sed.
+  LOGO_LINE="$(mktemp)"
+  B64="$(base64 -w0 "$LOGO_PNG" 2>/dev/null || base64 "$LOGO_PNG" | tr -d '\n')"
+  printf '  --logo:url("data:image/png;base64,%s");\n' "$B64" > "$LOGO_LINE"
+  awk -v f="$LOGO_LINE" '
+    /^  --logo:url\("data:image\/png;base64,/ { while ((getline l < f) > 0) print l; next }
+    { print }' "$T" > "$T.tmp" && mv "$T.tmp" "$T"
+
+  sed -i \
+    -e 's|<title>.*</title>|<title>V2Ray Usage</title>|' \
+    -e 's|aria-label="PXN Stores LK"|aria-label="V2Ray Usage"|' \
+    -e 's|>PXN STORES LK<|>V2RAY USAGE<|' \
+    "$T"
+
+  # Half a face is worse than either whole one, so prove every part landed.
+  grep -q '>V2RAY USAGE<' "$T" || die "V2Ray rewrite failed — the header still names the store."
+  grep -qxF "$(cat "$LOGO_LINE")" "$T" || die "V2Ray rewrite failed — the shield mark is not embedded."
+  [ "$(grep -c '^  --logo:url(' "$T")" -eq 1 ] || die "V2Ray rewrite failed — more than one logo in the page."
+  rm -f "$LOGO_LINE"
+  info "Installed page -> $T ${DIM}(V2Ray face)${RST}"
 fi
 
 # ---- stats server ------------------------------------------------------------

@@ -52,6 +52,14 @@ bash <(curl -Ls https://raw.githubusercontent.com/NightRiderr77/PXN-SUB/main/scr
 bash <(curl -Ls https://raw.githubusercontent.com/NightRiderr77/PXN-SUB/main/scripts/install.sh) --brandless --no-stats
 ```
 
+**V2Ray face** — the same page wearing the shield mark and a `V2RAY USAGE`
+header instead of the store lockup. Nothing else changes; the guides, support
+and footer all stay:
+
+```bash
+bash <(curl -Ls https://raw.githubusercontent.com/NightRiderr77/PXN-SUB/main/scripts/install.sh) --v2ray
+```
+
 **By hand** — copy `index.html` to e.g. `/usr/local/x-ui/pxn_sub/`, point the
 panel's *Sub Theme Directory* at it, `x-ui restart`. Latency is still real; the
 server monitor reads `—` until the collector is installed.
