@@ -299,6 +299,14 @@ body{
 .foot-link{color:var(--text-dim);text-decoration:none;font-weight:600;transition:color .2s var(--ease)}
 .foot-link:hover{color:var(--text)}
 
+/* Project credit. It names the page, not the operator, so it is styled to sit
+   quietly under the brand footer on the default face and to stand on its own
+   once --brandless or --v2ray has taken that footer away. */
+.credit{display:flex;align-items:center;justify-content:center;gap:6px;padding:10px 12px 0;color:var(--faint);font-size:11.5px;letter-spacing:.02em}
+.foot + .credit{margin-top:-8px;padding-top:0}
+.credit-link{color:var(--text-dim);text-decoration:none;font-weight:600;letter-spacing:.04em;transition:color .2s var(--ease)}
+.credit-link:hover{color:var(--text)}
+
 /* ============================ Toast ============================ */
 .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(140%);
   background:var(--surface-3);border:1px solid var(--line-strong);color:var(--text);
@@ -533,6 +541,15 @@ body{
     <a class="foot-link" href="https://pxnstores.lk" target="_blank" rel="noopener">pxnstores.lk</a>
   </footer>
   <!--/brand-->
+
+  <!-- Project credit. Deliberately outside the brand blocks: it names the page,
+       not the operator, so it survives every face — the way 3X-SUB's own credit
+       does. The brandless guard lets it through because it matches none of the
+       operator's strings. -->
+  <div class="credit reveal" style="animation-delay:.42s">
+    <span>Powered by</span>
+    <a class="credit-link" href="https://github.com/NightRiderr77/PXN-SUB" target="_blank" rel="noopener">PXN-SUB</a>
+  </div>
 </main>
 
 <div class="toast" id="toast"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span id="toastMsg">Copied</span></div>

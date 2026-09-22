@@ -96,7 +96,11 @@ never as a plausible-looking value.
 
 The installer removes the logo, the support links, the footer and the tab title
 from its copy of the markup. `--v2ray` takes out the same links and footer, and
-keeps only the lockup, with a different mark and name in it. It does not hide them with CSS — the markup would
+keeps only the lockup, with a different mark and name in it.
+
+Both leave one line standing: the `Powered by PXN-SUB` credit at the foot. That
+names the page, not the operator — the same thing 3X-SUB's own credit does, and
+the reason it sits outside the brand blocks rather than inside them. It does not hide them with CSS — the markup would
 still carry the domain and phone number, and anyone can open view-source. The
 installer aborts rather than install a page that still matches `pxnstores`,
 `PXN STORES` or `wa.me`.
